@@ -5,6 +5,7 @@ import com.couchlist.app.core.data.remote.ApiKeyInterceptor
 import com.couchlist.app.core.data.remote.TmdbApi
 import com.couchlist.app.core.data.repository.TmdbMediaRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
+import com.couchlist.app.core.domain.repository.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,7 +39,10 @@ object NetworkModule {
             .readTimeout(30, TimeUnit.SECONDS)
         if (BuildConfig.DEBUG) {
             builder.addInterceptor(
-                HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY },
+                HttpLoggingInterceptor().apply {
+                    redactQueryParams("api_key")
+                    level = HttpLoggingInterceptor.Level.BODY
+                },
             )
         }
         return builder.build()
@@ -61,5 +65,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideMediaRepository(api: TmdbApi): MediaRepository = TmdbMediaRepository(api)
+    fun provideMediaRepository(
+        api: TmdbApi,
+        settingsRepository: SettingsRepository,
+    ): MediaRepository = TmdbMediaRepository(api, settingsRepository)
 }

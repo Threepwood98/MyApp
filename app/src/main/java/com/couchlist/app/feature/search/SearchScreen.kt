@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -60,6 +59,7 @@ fun SearchRoute(
     viewModel: SearchViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
     onDetailClick: (Long) -> Unit = {},
+    showBack: Boolean = true,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -81,6 +81,7 @@ fun SearchRoute(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
         onBack = onBack,
+        showBack = showBack,
         onQueryChange = viewModel::onQueryChange,
         onRetry = viewModel::onRetry,
         onAddToWatchlist = viewModel::onAddToWatchlist,
@@ -94,6 +95,7 @@ private fun SearchContent(
     uiState: SearchUiState,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
+    showBack: Boolean,
     onQueryChange: (String) -> Unit,
     onRetry: () -> Unit,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
@@ -104,11 +106,13 @@ private fun SearchContent(
             TopAppBar(
                 title = { Text(text = "Search") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                        )
+                    if (showBack) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
                     }
                 },
             )
@@ -259,7 +263,7 @@ private fun MediaResultCard(
             )
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(6.dp),
+                shape = MaterialTheme.shapes.extraSmall,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(6.dp),
@@ -312,6 +316,7 @@ private fun SearchResultsPreview() {
             ),
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
+            showBack = true,
             onQueryChange = {},
             onRetry = {},
             onAddToWatchlist = {},

@@ -8,13 +8,15 @@ The Movie Database (TMDB).
 ## What it's for
 
 Instead of juggling streaming-app "add to list" buttons scattered across
-services, Couchlist keeps one personal list with three stages:
+services, Couchlist keeps catalog metadata, personal watch state, and list
+membership separate. Titles move through four watch states:
 
-| List       | What lives there                                        |
+| Status     | What lives there                                        |
 |------------|---------------------------------------------------------|
-| Watchlist  | Everything you plan to watch                            |
+| Backlog    | Everything you plan to watch                            |
 | Watching   | What you're currently working through                   |
-| Watched    | Titles you've finished                                  |
+| Completed  | Titles you've finished                                  |
+| Abandoned  | Titles you chose not to finish                          |
 
 The whole watchlist is stored **on-device** (Room), so your lists are always
 available — even with no connection. Network is only needed to search for new
@@ -22,11 +24,13 @@ titles and fetch details.
 
 ## Features
 
-- **Home — three-stage watchlist.** Tabs for Watchlist / Watching / Watched.
-  Every row shows a poster, the title, media type, and when it was added.
-  - **Swipe right** advances a title to the next list (Watchlist → Watching →
-    Watched).
-  - **Swipe left** removes it (with a snackbar confirmation).
+- **Home dashboard.** Continue Watching, Recently Added, and Recently Completed
+  sections keep the most useful titles close.
+- **Library.** Default Watchlist and The Pile list summaries plus Backlog /
+  Watching / Completed / Abandoned status tabs.
+  - **Swipe right** advances a title to its next status.
+  - **Swipe left** removes it from the library and its lists.
+  - Both actions offer **Undo** from the snackbar.
   - **Tap a row** to open the full detail screen.
 - **Search.** Type-ahead TMDB search (movies *and* TV in one grid) with
   debounced queries, poster cards, and a one-tap **Add to Watchlist** button.
@@ -36,9 +40,10 @@ titles and fetch details.
   category. Status controls let you add the title and move it between lists.
   Works **offline**: if the network is unavailable but the title is already in
   your lists, saved details are shown along with an offline banner.
-- **Settings.** App version and TMDB attribution (as required by TMDB's terms).
-- **Theming.** Follows your system light/dark setting; uses dynamic color on
-  Android 12+, with a warm "couch" palette as the fallback.
+- **Settings.** System/light/dark theme modes, dynamic-color control, streaming
+  provider region, app version, and TMDB attribution.
+- **Theming.** Uses dynamic color on Android 12+ when enabled, with a warm
+  "couch" palette as the fallback.
 
 ## Tech stack
 
@@ -46,7 +51,7 @@ titles and fetch details.
 - **Architecture:** MVVM with MVI-style UI state + one-shot effects
   (`StateFlow` + `Channel`)
 - **DI:** Hilt
-- **Local storage:** Room (offline-first watchlist)
+- **Local storage:** Room (offline-first catalog/library) + Preferences DataStore
 - **Networking:** Retrofit + OkHttp + `kotlinx.serialization`
 - **Images:** Coil 3
 - **Navigation:** Navigation Compose with type-safe `@Serializable` routes
@@ -92,7 +97,7 @@ app/src/main/java/com/couchlist/app/
 │   │   ├── remote/          # TMDB API, DTOs, API-key interceptor
 │   │   └── repository/      # Repository implementations
 │   ├── domain/
-│   │   ├── model/           # MediaItem, MediaDetail, MediaType, WatchStatus…
+│   │   ├── model/           # Catalog, library, list, status, and settings models
 │   │   └── repository/      # Repository interfaces
 │   ├── ui/
 │   │   ├── components/      # TMDB image URLs
@@ -101,16 +106,16 @@ app/src/main/java/com/couchlist/app/
 │   └── …
 └── feature/
     ├── detail/              # Detail screen + ViewModel
-    ├── home/                # Three-stage watchlist with swipe gestures
+    ├── home/                # Continue/recent dashboard
+    ├── library/             # Lists, status tabs, and undoable swipes
     ├── search/              # TMDB search
     └── settings/            # About + TMDB attribution
 ```
 
 ## Notes
 
-- **Picture handling:** swiping a card advances it between lists; swiping the
-  wrong way is not recoverable yet (no undo). Removing from a row is confirmed
-  via snackbar.
+- **Swipe handling:** status changes and removals are recoverable through the
+  snackbar Undo action.
 - **Offline behavior:** your lists are always available offline. Search and
   fresh detail data need a connection; already-saved titles still open with
   their stored details.

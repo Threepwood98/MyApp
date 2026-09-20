@@ -1,6 +1,9 @@
 package com.couchlist.app.core.data.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.MIGRATION_1_3
@@ -10,9 +13,11 @@ import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
+import com.couchlist.app.core.data.repository.PreferencesSettingsRepository
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
+import com.couchlist.app.core.domain.repository.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,9 +25,21 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+private val Context.settingsDataStore by preferencesDataStore(name = "settings")
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
+
+    @Provides
+    @Singleton
+    fun provideSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        context.settingsDataStore
+
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(dataStore: DataStore<Preferences>): SettingsRepository =
+        PreferencesSettingsRepository(dataStore)
 
     @Provides
     @Singleton

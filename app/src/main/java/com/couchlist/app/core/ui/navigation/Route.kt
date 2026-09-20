@@ -12,6 +12,9 @@ data object SettingsRoute
 data object SearchRoute
 
 @Serializable
+data object LibraryRoute
+
+@Serializable
 data class DetailRoute(
     val mediaId: Long,
 )

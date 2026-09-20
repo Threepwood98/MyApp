@@ -12,14 +12,16 @@ import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.model.ProviderCategory
 import com.couchlist.app.core.domain.model.WatchProvider
 import com.couchlist.app.core.domain.repository.MediaRepository
-import java.util.Locale
+import com.couchlist.app.core.domain.repository.SettingsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 
 @Singleton
 class TmdbMediaRepository @Inject constructor(
     private val api: TmdbApi,
+    private val settingsRepository: SettingsRepository,
 ) : MediaRepository {
 
     override suspend fun searchMulti(query: String): Result<List<MediaSearchResult>> =
@@ -50,14 +52,11 @@ class TmdbMediaRepository @Inject constructor(
             MediaType.MOVIE -> movieWatchProviders(id)
             MediaType.TV -> tvWatchProviders(id)
         }
-        val bundle = dto.results[deviceCountry()]
+        val bundle = dto.results[settingsRepository.settings.first().providerRegion]
             ?: dto.results["US"]
             ?: return emptyList()
         return bundle.toDomain()
     }
-
-    private fun deviceCountry(): String =
-        Locale.getDefault().country.ifBlank { "US" }
 
     private fun MediaResultDto.toDomain(): MediaSearchResult? {
         val type = when (mediaType) {

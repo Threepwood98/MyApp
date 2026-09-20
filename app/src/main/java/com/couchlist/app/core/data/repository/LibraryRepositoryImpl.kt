@@ -9,6 +9,9 @@ import com.couchlist.app.core.data.local.entity.MediaListEntity
 import com.couchlist.app.core.data.local.entity.MediaListJoinEntity
 import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
+import com.couchlist.app.core.domain.model.LibraryRemoval
+import com.couchlist.app.core.domain.model.ListMembership
+import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.repository.LibraryRepository
@@ -22,8 +25,14 @@ class LibraryRepositoryImpl @Inject constructor(
     private val mediaListDao: MediaListDao,
 ) : LibraryRepository {
 
+    override fun observeLibrary(): Flow<List<LibraryMedia>> =
+        libraryItemDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
     override fun observeStatus(status: MediaStatus): Flow<List<LibraryMedia>> =
         libraryItemDao.observeByStatus(status).map { rows -> rows.map { it.toDomain() } }
+
+    override fun observeLists(): Flow<List<MediaListSummary>> =
+        mediaListDao.observeSummaries().map { rows -> rows.map { it.toDomain() } }
 
     override fun observeEntry(mediaId: Long): Flow<LibraryItem?> =
         libraryItemDao.observeByMediaId(mediaId).map { it?.toDomain() }
@@ -86,12 +95,35 @@ class LibraryRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun removeItem(libraryItemId: Long) {
+    override suspend fun removeItem(libraryItemId: Long): LibraryRemoval? =
         database.withTransaction {
-            val existing = libraryItemDao.getById(libraryItemId) ?: return@withTransaction
+            val existing = libraryItemDao.getById(libraryItemId) ?: return@withTransaction null
+            val memberships = mediaListDao.getMemberships(existing.mediaId)
             mediaListDao.deleteMemberships(existing.mediaId)
             libraryItemDao.delete(libraryItemId)
+            LibraryRemoval(
+                item = existing.toDomain(),
+                memberships = memberships.map { ListMembership(it.listId, it.addedAt) },
+            )
         }
+
+    override suspend fun restoreRemoval(removal: LibraryRemoval) {
+        database.withTransaction {
+            libraryItemDao.insertIgnore(removal.item.toEntity())
+            removal.memberships.forEach { membership ->
+                mediaListDao.insertJoinIgnore(
+                    MediaListJoinEntity(
+                        listId = membership.listId,
+                        mediaId = removal.item.mediaId,
+                        addedAt = membership.addedAt,
+                    ),
+                )
+            }
+        }
+    }
+
+    override suspend fun restoreItemState(item: LibraryItem) {
+        libraryItemDao.update(item.toEntity())
     }
 
     override suspend fun isInLibrary(mediaId: Long): Boolean =

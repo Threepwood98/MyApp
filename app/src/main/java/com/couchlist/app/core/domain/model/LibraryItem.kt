@@ -21,3 +21,13 @@ data class LibraryItem(
         require(personalRating == null || personalRating in 1..10)
     }
 }
+
+data class ListMembership(
+    val listId: Long,
+    val addedAt: Long,
+)
+
+data class LibraryRemoval(
+    val item: LibraryItem,
+    val memberships: List<ListMembership>,
+)

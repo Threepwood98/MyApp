@@ -22,3 +22,8 @@ data class MediaList(
     val createdAt: Long,
     val updatedAt: Long,
 )
+
+data class MediaListSummary(
+    val list: MediaList,
+    val itemCount: Int,
+)

@@ -3,9 +3,13 @@ package com.couchlist.app.core.data.repository
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
 import com.couchlist.app.core.data.local.entity.LibraryMediaRow
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
+import com.couchlist.app.core.data.local.entity.MediaListEntity
+import com.couchlist.app.core.data.local.entity.MediaListSummaryRow
 import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.MediaItem
+import com.couchlist.app.core.domain.model.MediaList
+import com.couchlist.app.core.domain.model.MediaListSummary
 
 internal fun MediaItemEntity.toDomain() = MediaItem(
     id = id,
@@ -41,6 +45,20 @@ internal fun LibraryItemEntity.toDomain() = LibraryItem(
     updatedAt = updatedAt,
 )
 
+internal fun LibraryItem.toEntity() = LibraryItemEntity(
+    id = id,
+    mediaId = mediaId,
+    status = status,
+    progress = progress,
+    personalRating = personalRating,
+    favorite = favorite,
+    notes = notes,
+    addedAt = addedAt,
+    startedAt = startedAt,
+    completedAt = completedAt,
+    updatedAt = updatedAt,
+)
+
 internal fun LibraryMediaRow.toDomain() = LibraryMedia(
     media = media.toDomain(),
     library = LibraryItem(
@@ -56,4 +74,22 @@ internal fun LibraryMediaRow.toDomain() = LibraryMedia(
         completedAt = completedAt,
         updatedAt = updatedAt,
     ),
+)
+
+internal fun MediaListEntity.toDomain() = MediaList(
+    id = id,
+    name = name,
+    description = description,
+    type = type,
+    coverMediaId = coverMediaId,
+    isPinned = isPinned,
+    sortOrder = sortOrder,
+    smartFilterJson = smartFilterJson,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+internal fun MediaListSummaryRow.toDomain() = MediaListSummary(
+    list = list.toDomain(),
+    itemCount = itemCount,
 )
