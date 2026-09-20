@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.Flow
 interface WatchlistRepository {
     fun observeStatus(status: WatchStatus): Flow<List<MediaItem>>
 
+    fun observeEntry(tmdbId: Long, mediaType: MediaType): Flow<MediaItem?>
+
     suspend fun addToWatchlist(
         mediaType: MediaType,
         tmdbId: Long,

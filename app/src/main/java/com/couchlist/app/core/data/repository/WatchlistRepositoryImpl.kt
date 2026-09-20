@@ -18,6 +18,9 @@ class WatchlistRepositoryImpl @Inject constructor(
     override fun observeStatus(status: WatchStatus): Flow<List<MediaItem>> =
         dao.observeByStatus(status).map { entities -> entities.map { it.toDomain() } }
 
+    override fun observeEntry(tmdbId: Long, mediaType: MediaType): Flow<MediaItem?> =
+        dao.observeByTmdb(tmdbId, mediaType).map { it?.toDomain() }
+
     override suspend fun addToWatchlist(
         mediaType: MediaType,
         tmdbId: Long,

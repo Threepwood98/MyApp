@@ -2,11 +2,11 @@ package com.couchlist.app.feature.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaSearchResult
 import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.WatchlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
@@ -87,12 +86,9 @@ class SearchViewModel @Inject constructor(
                 }
             }
             .onFailure { throwable ->
-                val message = when (throwable) {
-                    is IOException -> "Check your connection and try again."
-                    is HttpException -> "TMDB is unavailable right now. Try again."
-                    else -> "Something went wrong. Try again."
+                _uiState.update {
+                    it.copy(isSearching = false, errorMessage = networkErrorMessage(throwable))
                 }
-                _uiState.update { it.copy(isSearching = false, errorMessage = message) }
             }
     }
 }

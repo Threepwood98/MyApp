@@ -17,6 +17,12 @@ interface WatchlistDao {
     )
     fun observeByStatus(status: WatchStatus): Flow<List<WatchlistEntity>>
 
+    @Query(
+        "SELECT * FROM watchlist_items " +
+            "WHERE tmdb_id = :tmdbId AND media_type = :mediaType",
+    )
+    fun observeByTmdb(tmdbId: Long, mediaType: MediaType): Flow<WatchlistEntity?>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(item: WatchlistEntity): Long
 

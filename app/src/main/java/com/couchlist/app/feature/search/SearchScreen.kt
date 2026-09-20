@@ -1,5 +1,6 @@
 package com.couchlist.app.feature.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +59,7 @@ import coil3.compose.AsyncImage
 fun SearchRoute(
     viewModel: SearchViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
+    onResultClick: (MediaSearchResult) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -81,6 +83,7 @@ fun SearchRoute(
         onQueryChange = viewModel::onQueryChange,
         onRetry = viewModel::onRetry,
         onAddToWatchlist = viewModel::onAddToWatchlist,
+        onResultClick = onResultClick,
     )
 }
 
@@ -93,6 +96,7 @@ private fun SearchContent(
     onQueryChange: (String) -> Unit,
     onRetry: () -> Unit,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
+    onResultClick: (MediaSearchResult) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -129,6 +133,7 @@ private fun SearchContent(
                 else -> SearchResultsGrid(
                     results = uiState.results,
                     onAddToWatchlist = onAddToWatchlist,
+                    onResultClick = onResultClick,
                 )
             }
         }
@@ -216,6 +221,7 @@ private fun SearchErrorState(
 private fun SearchResultsGrid(
     results: List<MediaSearchResult>,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
+    onResultClick: (MediaSearchResult) -> Unit,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -228,6 +234,7 @@ private fun SearchResultsGrid(
             MediaResultCard(
                 result = result,
                 onAddToWatchlist = onAddToWatchlist,
+                onResultClick = onResultClick,
             )
         }
     }
@@ -237,8 +244,9 @@ private fun SearchResultsGrid(
 private fun MediaResultCard(
     result: MediaSearchResult,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
+    onResultClick: (MediaSearchResult) -> Unit,
 ) {
-    Column {
+    Column(modifier = Modifier.clickable { onResultClick(result) }) {
         Box {
             AsyncImage(
                 model = TmdbImages.posterUrl(result.posterPath),
@@ -306,6 +314,7 @@ private fun SearchResultsPreview() {
             onQueryChange = {},
             onRetry = {},
             onAddToWatchlist = {},
+            onResultClick = {},
         )
     }
 }

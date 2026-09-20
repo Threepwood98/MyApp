@@ -31,13 +31,19 @@ class TmdbMediaRepository @Inject constructor(
             Result.failure(e)
         }
 
-    override suspend fun details(id: Long, mediaType: MediaType): MediaDetail {
-        val providers = api.watchProviders(id, mediaType)
-        return when (mediaType) {
-            MediaType.MOVIE -> api.movie(id).toDomain(mediaType, providers)
-            MediaType.TV -> api.tv(id).toDomain(mediaType, providers)
+    override suspend fun details(id: Long, mediaType: MediaType): Result<MediaDetail> =
+        try {
+            val providers = api.watchProviders(id, mediaType)
+            val detail = when (mediaType) {
+                MediaType.MOVIE -> api.movie(id).toDomain(mediaType, providers)
+                MediaType.TV -> api.tv(id).toDomain(mediaType, providers)
+            }
+            Result.success(detail)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-    }
 
     private suspend fun TmdbApi.watchProviders(id: Long, mediaType: MediaType): List<WatchProvider> {
         val dto = when (mediaType) {
