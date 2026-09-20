@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.couchlist.app.feature.home.HomeRoute
+import com.couchlist.app.feature.search.SearchRoute
 
 @Composable
 fun CouchlistNavHost(
@@ -18,7 +19,10 @@ fun CouchlistNavHost(
         modifier = modifier,
     ) {
         composable<HomeRoute> {
-            HomeRoute()
+            HomeRoute(onSearchClick = { navController.navigate(SearchRoute) })
+        }
+        composable<SearchRoute> {
+            SearchRoute(onBack = { navController.popBackStack() })
         }
     }
 }

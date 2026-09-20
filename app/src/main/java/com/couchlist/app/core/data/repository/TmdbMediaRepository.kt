@@ -15,14 +15,21 @@ import com.couchlist.app.core.domain.repository.MediaRepository
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 
 @Singleton
 class TmdbMediaRepository @Inject constructor(
     private val api: TmdbApi,
 ) : MediaRepository {
 
-    override suspend fun searchMulti(query: String): List<MediaSearchResult> =
-        api.searchMulti(query).results.mapNotNull { it.toDomain() }
+    override suspend fun searchMulti(query: String): Result<List<MediaSearchResult>> =
+        try {
+            Result.success(api.searchMulti(query).results.mapNotNull { it.toDomain() })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
 
     override suspend fun details(id: Long, mediaType: MediaType): MediaDetail {
         val providers = api.watchProviders(id, mediaType)

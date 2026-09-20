@@ -5,7 +5,7 @@ import com.couchlist.app.core.domain.model.MediaSearchResult
 import com.couchlist.app.core.domain.model.MediaType
 
 interface MediaRepository {
-    suspend fun searchMulti(query: String): List<MediaSearchResult>
+    suspend fun searchMulti(query: String): Result<List<MediaSearchResult>>
 
     suspend fun details(id: Long, mediaType: MediaType): MediaDetail
 }
