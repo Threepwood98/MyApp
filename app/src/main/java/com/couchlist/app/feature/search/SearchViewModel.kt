@@ -4,11 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaSearchResult
+import com.couchlist.app.core.domain.repository.CatalogRepository
+import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
-import com.couchlist.app.core.domain.repository.WatchlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,9 +25,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
+@OptIn(FlowPreview::class)
 class SearchViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
-    private val watchlistRepository: WatchlistRepository,
+    private val catalogRepository: CatalogRepository,
+    private val libraryRepository: LibraryRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -53,20 +58,35 @@ class SearchViewModel @Inject constructor(
 
     fun onAddToWatchlist(result: MediaSearchResult) {
         viewModelScope.launch {
-            if (watchlistRepository.isInWatchlist(result.id, result.mediaType)) {
-                _events.send(
-                    SearchEvent.ShowMessage("${result.title} is already in your Watchlist"),
-                )
-            } else {
-                watchlistRepository.addToWatchlist(
-                    mediaType = result.mediaType,
-                    tmdbId = result.id,
-                    title = result.title,
-                    posterPath = result.posterPath,
-                )
-                _events.send(
-                    SearchEvent.ShowMessage("Added ${result.title} to your Watchlist"),
-                )
+            try {
+                val media = catalogRepository.getOrCreate(result)
+                if (libraryRepository.isInLibrary(media.id)) {
+                    _events.send(
+                        SearchEvent.ShowMessage("${result.title} is already in your Watchlist"),
+                    )
+                } else {
+                    libraryRepository.addToWatchlist(media.id)
+                    _events.send(
+                        SearchEvent.ShowMessage("Added ${result.title} to your Watchlist"),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.send(SearchEvent.ShowMessage("Couldn't add ${result.title}"))
+            }
+        }
+    }
+
+    fun onResultClick(result: MediaSearchResult) {
+        viewModelScope.launch {
+            try {
+                val media = catalogRepository.getOrCreate(result)
+                _events.send(SearchEvent.NavigateToDetail(media.id))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.send(SearchEvent.ShowMessage("Couldn't open ${result.title}"))
             }
         }
     }
@@ -102,4 +122,6 @@ data class SearchUiState(
 
 sealed interface SearchEvent {
     data class ShowMessage(val message: String) : SearchEvent
+
+    data class NavigateToDetail(val mediaId: Long) : SearchEvent
 }

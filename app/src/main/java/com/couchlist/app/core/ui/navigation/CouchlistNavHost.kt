@@ -5,7 +5,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
 import com.couchlist.app.feature.detail.DetailRoute as DetailScreen
 import com.couchlist.app.feature.home.HomeRoute
 import com.couchlist.app.feature.search.SearchRoute
@@ -26,7 +25,7 @@ fun CouchlistNavHost(
                 onSearchClick = { navController.navigate(SearchRoute) },
                 onSettingsClick = { navController.navigate(SettingsRoute) },
                 onItemClick = { item ->
-                    navController.navigate(DetailRoute(item.tmdbId, item.mediaType))
+                    navController.navigate(DetailRoute(item.media.id))
                 },
             )
         }
@@ -36,16 +35,11 @@ fun CouchlistNavHost(
         composable<SearchRoute> {
             SearchRoute(
                 onBack = { navController.popBackStack() },
-                onResultClick = { result ->
-                    navController.navigate(DetailRoute(result.id, result.mediaType))
-                },
+                onDetailClick = { mediaId -> navController.navigate(DetailRoute(mediaId)) },
             )
         }
-        composable<DetailRoute> { backStackEntry ->
-            val route = backStackEntry.toRoute<DetailRoute>()
+        composable<DetailRoute> {
             DetailScreen(
-                tmdbId = route.tmdbId,
-                mediaType = route.mediaType,
                 onBack = { navController.popBackStack() },
             )
         }

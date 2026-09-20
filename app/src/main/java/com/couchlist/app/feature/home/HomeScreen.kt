@@ -59,9 +59,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
+import com.couchlist.app.core.domain.model.LibraryItem
+import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.MediaItem
+import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.MediaType
-import com.couchlist.app.core.domain.model.WatchStatus
 import com.couchlist.app.core.domain.model.nextStatus
 import com.couchlist.app.core.ui.components.TmdbImages
 import com.couchlist.app.core.ui.theme.CouchlistTheme
@@ -72,11 +74,11 @@ fun HomeRoute(
     viewModel: HomeViewModel = hiltViewModel(),
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onItemClick: (MediaItem) -> Unit = {},
+    onItemClick: (LibraryMedia) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = WatchStatus.entries
+    val tabs = MediaStatus.entries
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
@@ -128,9 +130,10 @@ fun HomeRoute(
                 }
             }
             val items = when (tabs[selectedTab]) {
-                WatchStatus.WATCHLIST -> uiState.watchlist
-                WatchStatus.WATCHING -> uiState.watching
-                WatchStatus.WATCHED -> uiState.watched
+                MediaStatus.BACKLOG -> uiState.backlog
+                MediaStatus.WATCHING -> uiState.watching
+                MediaStatus.COMPLETED -> uiState.completed
+                MediaStatus.ABANDONED -> uiState.abandoned
             }
             StatusList(
                 status = tabs[selectedTab],
@@ -145,18 +148,18 @@ fun HomeRoute(
 
 @Composable
 private fun StatusList(
-    status: WatchStatus,
-    items: List<MediaItem>,
-    onAdvance: (MediaItem) -> Unit,
-    onRemove: (MediaItem) -> Unit,
-    onItemClick: (MediaItem) -> Unit,
+    status: MediaStatus,
+    items: List<LibraryMedia>,
+    onAdvance: (LibraryMedia) -> Unit,
+    onRemove: (LibraryMedia) -> Unit,
+    onItemClick: (LibraryMedia) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dismissedItems = remember { mutableStateMapOf<Long, Boolean>() }
     LaunchedEffect(items) {
-        dismissedItems.keys.removeAll { key -> items.none { it.id == key } }
+        dismissedItems.keys.removeAll { key -> items.none { it.library.id == key } }
     }
-    val visibleItems = items.filterNot { dismissedItems.containsKey(it.id) }
+    val visibleItems = items.filterNot { dismissedItems.containsKey(it.library.id) }
 
     if (visibleItems.isEmpty() && items.isEmpty()) {
         Column(
@@ -172,9 +175,10 @@ private fun StatusList(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = when (status) {
-                    WatchStatus.WATCHLIST -> "Search for something to add."
-                    WatchStatus.WATCHING -> "Swipe right on a card to start watching it."
-                    WatchStatus.WATCHED -> "Advance a title to mark it watched."
+                    MediaStatus.BACKLOG -> "Search for something to add."
+                    MediaStatus.WATCHING -> "Swipe right on a title to start watching it."
+                    MediaStatus.COMPLETED -> "Advance a title to mark it completed."
+                    MediaStatus.ABANDONED -> "Titles you stop watching appear here."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -182,13 +186,13 @@ private fun StatusList(
         }
     } else {
         LazyColumn(modifier = modifier.fillMaxSize()) {
-            items(items = visibleItems, key = { it.id }) { item ->
+            items(items = visibleItems, key = { it.library.id }) { item ->
                 SwipeableMediaItem(
                     item = item,
                     onAdvance = onAdvance,
                     onRemove = onRemove,
                     onItemClick = onItemClick,
-                    onDismissed = { dismissedItems[item.id] = true },
+                    onDismissed = { dismissedItems[item.library.id] = true },
                 )
                 HorizontalDivider()
             }
@@ -198,17 +202,17 @@ private fun StatusList(
 
 @Composable
 private fun SwipeableMediaItem(
-    item: MediaItem,
-    onAdvance: (MediaItem) -> Unit,
-    onRemove: (MediaItem) -> Unit,
-    onItemClick: (MediaItem) -> Unit,
+    item: LibraryMedia,
+    onAdvance: (LibraryMedia) -> Unit,
+    onRemove: (LibraryMedia) -> Unit,
+    onItemClick: (LibraryMedia) -> Unit,
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dismissState = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = item.status.nextStatus != null,
+        enableDismissFromStartToEnd = item.library.status.nextStatus != null,
         onDismiss = { direction ->
             when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> onAdvance(item)
@@ -227,7 +231,7 @@ private fun SwipeableMediaItem(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Move to next list",
+                    contentDescription = "Move to next status",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
@@ -240,7 +244,7 @@ private fun SwipeableMediaItem(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
-                    contentDescription = "Remove from watchlist",
+                    contentDescription = "Remove from library",
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
@@ -256,7 +260,7 @@ private fun SwipeableMediaItem(
 
 @Composable
 private fun MediaItemRow(
-    item: MediaItem,
+    item: LibraryMedia,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -269,9 +273,9 @@ private fun MediaItemRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (item.posterPath != null) {
+        if (item.media.posterPath != null) {
             AsyncImage(
-                model = TmdbImages.posterUrl(item.posterPath, "w154"),
+                model = TmdbImages.posterUrl(item.media.posterPath, "w154"),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
@@ -300,14 +304,14 @@ private fun MediaItemRow(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.title,
+                text = item.media.title,
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "${item.mediaType.name} · Added ${DateUtils.getRelativeTimeSpanString(item.addedAt)}",
+                text = "${item.media.mediaType.name} · Added ${DateUtils.getRelativeTimeSpanString(item.library.addedAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -319,18 +323,42 @@ private fun MediaItemRow(
 @Composable
 private fun StatusListPreview() {
     CouchlistTheme {
-        val sample = MediaItem(
-            id = 1L,
-            mediaType = MediaType.MOVIE,
-            tmdbId = 550L,
-            title = "Fight Club",
-            posterPath = null,
-            status = WatchStatus.WATCHLIST,
-            sortOrder = 0,
-            addedAt = 1L,
+        val sample = LibraryMedia(
+            media = MediaItem(
+                id = 1L,
+                mediaType = MediaType.MOVIE,
+                tmdbId = 550L,
+                title = "Fight Club",
+                originalTitle = "Fight Club",
+                overview = null,
+                posterPath = null,
+                backdropPath = null,
+                releaseDate = "1999-10-15",
+                originalLanguage = "en",
+                runtimeMinutes = 139,
+                externalRating = 8.4,
+                externalVoteCount = 0,
+                genres = listOf("Drama"),
+                lastRefreshedAt = null,
+                createdAt = 1L,
+                updatedAt = 1L,
+            ),
+            library = LibraryItem(
+                id = 1L,
+                mediaId = 1L,
+                status = MediaStatus.BACKLOG,
+                progress = null,
+                personalRating = null,
+                favorite = false,
+                notes = null,
+                addedAt = 1L,
+                startedAt = null,
+                completedAt = null,
+                updatedAt = 1L,
+            ),
         )
         StatusList(
-            status = WatchStatus.WATCHLIST,
+            status = MediaStatus.BACKLOG,
             items = listOf(sample),
             onAdvance = {},
             onRemove = {},

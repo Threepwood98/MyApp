@@ -6,10 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaDetail
 import com.couchlist.app.core.domain.model.MediaItem
-import com.couchlist.app.core.domain.model.MediaType
-import com.couchlist.app.core.domain.model.WatchStatus
-import com.couchlist.app.core.domain.repository.MediaRepository
-import com.couchlist.app.core.domain.repository.WatchlistRepository
+import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.WatchProvider
+import com.couchlist.app.core.domain.repository.CatalogRepository
+import com.couchlist.app.core.domain.repository.LibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -25,14 +25,11 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val mediaRepository: MediaRepository,
-    private val watchlistRepository: WatchlistRepository,
+    private val catalogRepository: CatalogRepository,
+    private val libraryRepository: LibraryRepository,
 ) : ViewModel() {
 
-    private val tmdbId: Long = savedStateHandle.get<Long>("tmdbId") ?: -1L
-    private val mediaType: MediaType? = savedStateHandle
-        .get<String>("mediaType")
-        ?.let { runCatching { MediaType.valueOf(it) }.getOrNull() }
+    private val mediaId: Long = savedStateHandle.get<Long>("mediaId") ?: -1L
 
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -40,20 +37,21 @@ class DetailViewModel @Inject constructor(
     private val _events = Channel<DetailEvent>(Channel.BUFFERED)
     val events: Flow<DetailEvent> = _events.receiveAsFlow()
 
+    private val providers = MutableStateFlow<List<WatchProvider>>(emptyList())
+
     init {
-        if (mediaType == null || tmdbId < 0L) {
+        if (mediaId < 0L) {
             _uiState.update {
                 it.copy(isLoading = false, errorMessage = "Couldn't load this title.")
             }
         } else {
-            viewModelScope.launch { load() }
+            observeDetail()
+            refresh()
         }
     }
 
     fun onRetry() {
-        if (_uiState.value.detail == null && mediaType != null && tmdbId >= 0L) {
-            viewModelScope.launch { load() }
-        }
+        refresh()
     }
 
     fun onAddToWatchlist() {
@@ -64,27 +62,17 @@ class DetailViewModel @Inject constructor(
                 _events.send(DetailEvent.ShowMessage("${detail.title} is already in your Watchlist"))
                 return@launch
             }
-            watchlistRepository.addToWatchlist(
-                mediaType = detail.mediaType,
-                tmdbId = detail.id,
-                title = detail.title,
-                posterPath = detail.posterPath,
-            )
+            libraryRepository.addToWatchlist(mediaId)
             _events.send(DetailEvent.ShowMessage("Added ${detail.title} to your Watchlist"))
         }
     }
 
-    fun onSetStatus(status: WatchStatus) {
+    fun onSetStatus(status: MediaStatus) {
         viewModelScope.launch {
             val state = _uiState.value
-            val detail = state.detail ?: return@launch
-            val entryId = state.entryId ?: watchlistRepository.addToWatchlist(
-                mediaType = detail.mediaType,
-                tmdbId = detail.id,
-                title = detail.title,
-                posterPath = detail.posterPath,
-            )
-            watchlistRepository.moveItem(entryId, status)
+            state.detail ?: return@launch
+            val entryId = state.entryId ?: libraryRepository.addToWatchlist(mediaId)
+            libraryRepository.moveItem(entryId, status)
             _events.send(DetailEvent.ShowMessage("Moved to ${status.displayName}"))
         }
     }
@@ -94,40 +82,63 @@ class DetailViewModel @Inject constructor(
             val entryId = _uiState.value.entryId
             val title = _uiState.value.detail?.title ?: "title"
             if (entryId != null) {
-                watchlistRepository.removeItem(entryId)
+                libraryRepository.removeItem(entryId)
             }
             _events.send(DetailEvent.ShowMessage("Removed $title from your lists"))
         }
     }
 
-    private suspend fun load() {
-        _uiState.update {
-            it.copy(isLoading = true, errorMessage = null, isOffline = false)
+    private fun observeDetail() {
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                catalogRepository.observeMedia(mediaId),
+                libraryRepository.observeEntry(mediaId),
+                providers,
+            ) { media, entry, providers -> Triple(media, entry, providers) }
+                .collect { (media, entry, currentProviders) ->
+                    _uiState.update { state ->
+                        state.copy(
+                            detail = media?.toDetail(currentProviders),
+                            entryId = entry?.id,
+                            status = entry?.status,
+                            isLoading = media == null && state.isLoading,
+                            errorMessage = if (media != null) null else state.errorMessage,
+                        )
+                    }
+                }
         }
-        val enabledType = mediaType ?: return
-        val detailResult = try {
-            mediaRepository.details(tmdbId, enabledType)
-        } catch (e: CancellationException) {
-            throw e
-        }
-        val fetchedDetail = detailResult.getOrNull()
+    }
 
-        watchlistRepository.observeEntry(tmdbId, enabledType).collect { entry ->
-            val fallback = entry?.toFallbackDetail(tmdbId)
+    private fun refresh() {
+        if (mediaId < 0L) return
+        viewModelScope.launch {
             _uiState.update { state ->
                 state.copy(
-                    detail = fetchedDetail ?: fallback,
-                    entryId = entry?.id,
-                    status = entry?.status,
-                    isLoading = false,
-                    isOffline = fetchedDetail == null && entry != null,
-                    errorMessage = when {
-                        fetchedDetail != null || fallback != null -> null
-                        else -> networkErrorMessage(
-                            detailResult.exceptionOrNull() ?: IllegalStateException(),
-                        )
-                    },
+                    isLoading = state.detail == null,
+                    errorMessage = null,
+                    isOffline = false,
                 )
+            }
+            val result = try {
+                catalogRepository.refresh(mediaId)
+            } catch (e: CancellationException) {
+                throw e
+            }
+            result.onSuccess { refreshedProviders ->
+                providers.value = refreshedProviders
+                _uiState.update { it.copy(isLoading = false, isOffline = false) }
+            }.onFailure { throwable ->
+                _uiState.update { state ->
+                    state.copy(
+                        isLoading = false,
+                        isOffline = state.detail != null,
+                        errorMessage = if (state.detail == null) {
+                            networkErrorMessage(throwable)
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
         }
     }
@@ -136,22 +147,27 @@ class DetailViewModel @Inject constructor(
 data class DetailUiState(
     val detail: MediaDetail? = null,
     val entryId: Long? = null,
-    val status: WatchStatus? = null,
+    val status: MediaStatus? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val isOffline: Boolean = false,
 )
 
-private fun MediaItem.toFallbackDetail(tmdbId: Long) = MediaDetail(
+private fun MediaItem.toDetail(providers: List<WatchProvider>) = MediaDetail(
     id = tmdbId,
     mediaType = mediaType,
     title = title,
-    overview = null,
-    releaseYear = null,
+    originalTitle = originalTitle,
+    overview = overview,
+    releaseDate = releaseDate,
+    originalLanguage = originalLanguage,
+    runtimeMinutes = runtimeMinutes,
     posterPath = posterPath,
-    backdropPath = null,
-    voteAverage = 0.0,
-    providers = emptyList(),
+    backdropPath = backdropPath,
+    voteAverage = externalRating,
+    voteCount = externalVoteCount,
+    genres = genres,
+    providers = providers,
 )
 
 sealed interface DetailEvent {

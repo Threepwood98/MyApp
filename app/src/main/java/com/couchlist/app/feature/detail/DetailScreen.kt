@@ -52,10 +52,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.couchlist.app.core.domain.model.MediaDetail
+import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.model.ProviderCategory
 import com.couchlist.app.core.domain.model.WatchProvider
-import com.couchlist.app.core.domain.model.WatchStatus
 import com.couchlist.app.core.ui.components.TmdbImages
 import com.couchlist.app.core.ui.theme.CouchlistTheme
 import coil3.compose.AsyncImage
@@ -63,8 +63,6 @@ import coil3.compose.AsyncImage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailRoute(
-    tmdbId: Long,
-    mediaType: MediaType,
     viewModel: DetailViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
 ) {
@@ -136,7 +134,7 @@ fun DetailRoute(
 private fun DetailContent(
     uiState: DetailUiState,
     onAddToWatchlist: () -> Unit,
-    onSetStatus: (WatchStatus) -> Unit,
+    onSetStatus: (MediaStatus) -> Unit,
     onRemoveFromWatchlist: () -> Unit,
 ) {
     val detail = uiState.detail ?: return
@@ -215,7 +213,7 @@ private fun DetailContent(
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WatchStatus.entries.forEach { status ->
+                    MediaStatus.entries.forEach { status ->
                         FilterChip(
                             selected = uiState.status == status,
                             onClick = { onSetStatus(status) },
@@ -258,7 +256,7 @@ private fun OfflineBanner() {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "You're offline — showing the details you saved",
+                text = "You're offline: showing the details you saved",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -344,11 +342,16 @@ private fun DetailContentPreview() {
                     id = 550,
                     mediaType = MediaType.MOVIE,
                     title = "Fight Club",
+                    originalTitle = "Fight Club",
                     overview = "A ticking-time-bomb insomniac and a slippery soap salesman channel primal male aggression into a shocking new form of therapy.",
-                    releaseYear = 1999,
+                    releaseDate = "1999-10-15",
+                    originalLanguage = "en",
+                    runtimeMinutes = 139,
                     posterPath = null,
                     backdropPath = null,
                     voteAverage = 8.4,
+                    voteCount = 30_000,
+                    genres = listOf("Drama"),
                     providers = listOf(
                         WatchProvider(
                             providerId = 8,
@@ -358,7 +361,7 @@ private fun DetailContentPreview() {
                         ),
                     ),
                 ),
-                status = WatchStatus.WATCHLIST,
+                status = MediaStatus.BACKLOG,
                 entryId = 1L,
             ),
             onAddToWatchlist = {},

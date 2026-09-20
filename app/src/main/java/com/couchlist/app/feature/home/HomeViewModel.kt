@@ -2,10 +2,10 @@ package com.couchlist.app.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.couchlist.app.core.domain.model.MediaItem
-import com.couchlist.app.core.domain.model.WatchStatus
+import com.couchlist.app.core.domain.model.LibraryMedia
+import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.nextStatus
-import com.couchlist.app.core.domain.repository.WatchlistRepository
+import com.couchlist.app.core.domain.repository.LibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -19,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: WatchlistRepository,
+    private val repository: LibraryRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -31,14 +31,16 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             combine(
-                repository.observeStatus(WatchStatus.WATCHLIST),
-                repository.observeStatus(WatchStatus.WATCHING),
-                repository.observeStatus(WatchStatus.WATCHED),
-            ) { watchlist, watching, watched ->
+                repository.observeStatus(MediaStatus.BACKLOG),
+                repository.observeStatus(MediaStatus.WATCHING),
+                repository.observeStatus(MediaStatus.COMPLETED),
+                repository.observeStatus(MediaStatus.ABANDONED),
+            ) { backlog, watching, completed, abandoned ->
                 HomeUiState(
-                    watchlist = watchlist,
+                    backlog = backlog,
                     watching = watching,
-                    watched = watched,
+                    completed = completed,
+                    abandoned = abandoned,
                 )
             }.collect { state ->
                 _uiState.value = state
@@ -46,23 +48,24 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onAdvanceStatus(item: MediaItem) {
-        val next = item.status.nextStatus ?: return
-        viewModelScope.launch { repository.moveItem(item.id, next) }
+    fun onAdvanceStatus(item: LibraryMedia) {
+        val next = item.library.status.nextStatus ?: return
+        viewModelScope.launch { repository.moveItem(item.library.id, next) }
     }
 
-    fun onRemove(item: MediaItem) {
+    fun onRemove(item: LibraryMedia) {
         viewModelScope.launch {
-            repository.removeItem(item.id)
-            _events.send(HomeEvent.ShowMessage("Removed ${item.title}"))
+            repository.removeItem(item.library.id)
+            _events.send(HomeEvent.ShowMessage("Removed ${item.media.title}"))
         }
     }
 }
 
 data class HomeUiState(
-    val watchlist: List<MediaItem> = emptyList(),
-    val watching: List<MediaItem> = emptyList(),
-    val watched: List<MediaItem> = emptyList(),
+    val backlog: List<LibraryMedia> = emptyList(),
+    val watching: List<LibraryMedia> = emptyList(),
+    val completed: List<LibraryMedia> = emptyList(),
+    val abandoned: List<LibraryMedia> = emptyList(),
 )
 
 sealed interface HomeEvent {

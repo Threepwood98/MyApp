@@ -59,7 +59,7 @@ import coil3.compose.AsyncImage
 fun SearchRoute(
     viewModel: SearchViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onResultClick: (MediaSearchResult) -> Unit = {},
+    onDetailClick: (Long) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -71,6 +71,7 @@ fun SearchRoute(
                 when (event) {
                     is SearchEvent.ShowMessage ->
                         snackbarHostState.showSnackbar(event.message)
+                    is SearchEvent.NavigateToDetail -> onDetailClick(event.mediaId)
                 }
             }
         }
@@ -83,7 +84,7 @@ fun SearchRoute(
         onQueryChange = viewModel::onQueryChange,
         onRetry = viewModel::onRetry,
         onAddToWatchlist = viewModel::onAddToWatchlist,
-        onResultClick = onResultClick,
+        onResultClick = viewModel::onResultClick,
     )
 }
 

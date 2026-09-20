@@ -3,9 +3,16 @@ package com.couchlist.app.core.data.di
 import android.content.Context
 import androidx.room.Room
 import com.couchlist.app.core.data.local.CouchlistDatabase
-import com.couchlist.app.core.data.local.dao.WatchlistDao
-import com.couchlist.app.core.data.repository.WatchlistRepositoryImpl
-import com.couchlist.app.core.domain.repository.WatchlistRepository
+import com.couchlist.app.core.data.local.MIGRATION_1_3
+import com.couchlist.app.core.data.local.SEED_DEFAULT_LISTS_CALLBACK
+import com.couchlist.app.core.data.local.dao.LibraryItemDao
+import com.couchlist.app.core.data.local.dao.MediaItemDao
+import com.couchlist.app.core.data.local.dao.MediaListDao
+import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
+import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
+import com.couchlist.app.core.domain.repository.CatalogRepository
+import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.MediaRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -24,15 +31,36 @@ object DataModule {
             context,
             CouchlistDatabase::class.java,
             "couchlist.db",
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_3)
+            .addCallback(SEED_DEFAULT_LISTS_CALLBACK)
+            .build()
 
     @Provides
     @Singleton
-    fun provideWatchlistDao(database: CouchlistDatabase): WatchlistDao =
-        database.watchlistDao()
+    fun provideMediaItemDao(database: CouchlistDatabase): MediaItemDao = database.mediaItemDao()
 
     @Provides
     @Singleton
-    fun provideWatchlistRepository(dao: WatchlistDao): WatchlistRepository =
-        WatchlistRepositoryImpl(dao)
+    fun provideLibraryItemDao(database: CouchlistDatabase): LibraryItemDao =
+        database.libraryItemDao()
+
+    @Provides
+    @Singleton
+    fun provideMediaListDao(database: CouchlistDatabase): MediaListDao = database.mediaListDao()
+
+    @Provides
+    @Singleton
+    fun provideLibraryRepository(
+        database: CouchlistDatabase,
+        libraryItemDao: LibraryItemDao,
+        mediaListDao: MediaListDao,
+    ): LibraryRepository = LibraryRepositoryImpl(database, libraryItemDao, mediaListDao)
+
+    @Provides
+    @Singleton
+    fun provideCatalogRepository(
+        mediaItemDao: MediaItemDao,
+        mediaRepository: MediaRepository,
+    ): CatalogRepository = CatalogRepositoryImpl(mediaItemDao, mediaRepository)
 }
