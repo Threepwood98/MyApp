@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -143,6 +145,9 @@ private fun DetailContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
+        if (uiState.isOffline) {
+            OfflineBanner()
+        }
         AsyncImage(
             model = TmdbImages.backdropUrl(detail.backdropPath)
                 ?: TmdbImages.posterUrl(detail.posterPath),
@@ -184,15 +189,17 @@ private fun DetailContent(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Overview",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = detail.overview.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (!detail.overview.isNullOrBlank()) {
+                Text(
+                    text = "Overview",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = detail.overview,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = if (uiState.status == null) "Add to your lists" else "Status",
@@ -230,6 +237,31 @@ private fun DetailContent(
                     ProviderRow(label = category.displayName, providers = providers)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OfflineBanner() {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "You're offline — showing the details you saved",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

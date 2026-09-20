@@ -1,7 +1,9 @@
 package com.couchlist.app.feature.home
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -157,13 +159,24 @@ private fun StatusList(
     val visibleItems = items.filterNot { dismissedItems.containsKey(it.id) }
 
     if (visibleItems.isEmpty() && items.isEmpty()) {
-        Box(
+        Column(
             modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = "${status.displayName} is empty",
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = when (status) {
+                    WatchStatus.WATCHLIST -> "Search for something to add."
+                    WatchStatus.WATCHING -> "Swipe right on a card to start watching it."
+                    WatchStatus.WATCHED -> "Advance a title to mark it watched."
+                },
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -294,7 +307,7 @@ private fun MediaItemRow(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "${item.mediaType.name} · ${item.status.displayName}",
+                text = "${item.mediaType.name} · Added ${DateUtils.getRelativeTimeSpanString(item.addedAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

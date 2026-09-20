@@ -5,12 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaDetail
+import com.couchlist.app.core.domain.model.MediaItem
 import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.model.WatchStatus
 import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.WatchlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,23 +101,32 @@ class DetailViewModel @Inject constructor(
     }
 
     private suspend fun load() {
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        _uiState.update {
+            it.copy(isLoading = true, errorMessage = null, isOffline = false)
+        }
         val enabledType = mediaType ?: return
-        val detail = mediaRepository.details(tmdbId, enabledType)
-            .getOrElse { error ->
-                _uiState.update {
-                    it.copy(isLoading = false, errorMessage = networkErrorMessage(error))
-                }
-                return
-            }
+        val detailResult = try {
+            mediaRepository.details(tmdbId, enabledType)
+        } catch (e: CancellationException) {
+            throw e
+        }
+        val fetchedDetail = detailResult.getOrNull()
+
         watchlistRepository.observeEntry(tmdbId, enabledType).collect { entry ->
-            _uiState.update {
-                it.copy(
-                    detail = detail,
+            val fallback = entry?.toFallbackDetail(tmdbId)
+            _uiState.update { state ->
+                state.copy(
+                    detail = fetchedDetail ?: fallback,
                     entryId = entry?.id,
                     status = entry?.status,
                     isLoading = false,
-                    errorMessage = null,
+                    isOffline = fetchedDetail == null && entry != null,
+                    errorMessage = when {
+                        fetchedDetail != null || fallback != null -> null
+                        else -> networkErrorMessage(
+                            detailResult.exceptionOrNull() ?: IllegalStateException(),
+                        )
+                    },
                 )
             }
         }
@@ -128,6 +139,19 @@ data class DetailUiState(
     val status: WatchStatus? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+    val isOffline: Boolean = false,
+)
+
+private fun MediaItem.toFallbackDetail(tmdbId: Long) = MediaDetail(
+    id = tmdbId,
+    mediaType = mediaType,
+    title = title,
+    overview = null,
+    releaseYear = null,
+    posterPath = posterPath,
+    backdropPath = null,
+    voteAverage = 0.0,
+    providers = emptyList(),
 )
 
 sealed interface DetailEvent {
