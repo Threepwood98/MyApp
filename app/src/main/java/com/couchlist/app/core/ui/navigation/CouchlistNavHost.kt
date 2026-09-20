@@ -21,7 +21,12 @@ fun CouchlistNavHost(
         modifier = modifier,
     ) {
         composable<HomeRoute> {
-            HomeRoute(onSearchClick = { navController.navigate(SearchRoute) })
+            HomeRoute(
+                onSearchClick = { navController.navigate(SearchRoute) },
+                onItemClick = { item ->
+                    navController.navigate(DetailRoute(item.tmdbId, item.mediaType))
+                },
+            )
         }
         composable<SearchRoute> {
             SearchRoute(
