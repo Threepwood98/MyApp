@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -68,6 +69,7 @@ import com.couchlist.app.core.ui.theme.CouchlistTheme
 fun HomeRoute(
     viewModel: HomeViewModel = hiltViewModel(),
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onItemClick: (MediaItem) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -92,6 +94,12 @@ fun HomeRoute(
             TopAppBar(
                 title = { Text(text = "Couchlist") },
                 actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Settings",
+                        )
+                    }
                     IconButton(onClick = onSearchClick) {
                         Icon(
                             imageVector = Icons.Default.Search,

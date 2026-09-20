@@ -9,6 +9,7 @@ import androidx.navigation.toRoute
 import com.couchlist.app.feature.detail.DetailRoute as DetailScreen
 import com.couchlist.app.feature.home.HomeRoute
 import com.couchlist.app.feature.search.SearchRoute
+import com.couchlist.app.feature.settings.SettingsRoute
 
 @Composable
 fun CouchlistNavHost(
@@ -23,10 +24,14 @@ fun CouchlistNavHost(
         composable<HomeRoute> {
             HomeRoute(
                 onSearchClick = { navController.navigate(SearchRoute) },
+                onSettingsClick = { navController.navigate(SettingsRoute) },
                 onItemClick = { item ->
                     navController.navigate(DetailRoute(item.tmdbId, item.mediaType))
                 },
             )
+        }
+        composable<SettingsRoute> {
+            SettingsRoute(onBack = { navController.popBackStack() })
         }
         composable<SearchRoute> {
             SearchRoute(
