@@ -3,6 +3,7 @@ package com.couchlist.app.core.data.remote
 import com.couchlist.app.core.data.remote.dto.MovieDetailDto
 import com.couchlist.app.core.data.remote.dto.MultiSearchDto
 import com.couchlist.app.core.data.remote.dto.TvDetailDto
+import com.couchlist.app.core.data.remote.dto.TvSeasonDetailDto
 import com.couchlist.app.core.data.remote.dto.WatchProvidersDto
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -26,6 +27,12 @@ interface TmdbApi {
     suspend fun tv(
         @Path("id") id: Long,
     ): TvDetailDto
+
+    @GET("tv/{id}/season/{season_number}")
+    suspend fun tvSeason(
+        @Path("id") id: Long,
+        @Path("season_number") seasonNumber: Int,
+    ): TvSeasonDetailDto
 
     @GET("movie/{id}/watch/providers")
     suspend fun movieWatchProviders(

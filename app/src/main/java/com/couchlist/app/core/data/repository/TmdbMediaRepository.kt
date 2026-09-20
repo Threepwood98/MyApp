@@ -5,11 +5,16 @@ import com.couchlist.app.core.data.remote.dto.CountryProvidersDto
 import com.couchlist.app.core.data.remote.dto.MediaProviderDto
 import com.couchlist.app.core.data.remote.dto.MediaResultDto
 import com.couchlist.app.core.data.remote.dto.MovieDetailDto
+import com.couchlist.app.core.data.remote.dto.SeasonSummaryDto
 import com.couchlist.app.core.data.remote.dto.TvDetailDto
+import com.couchlist.app.core.data.remote.dto.TvSeasonDetailDto
+import com.couchlist.app.core.domain.model.EpisodeMetadata
 import com.couchlist.app.core.domain.model.MediaDetail
 import com.couchlist.app.core.domain.model.MediaSearchResult
 import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.model.ProviderCategory
+import com.couchlist.app.core.domain.model.SeasonDetails
+import com.couchlist.app.core.domain.model.SeasonMetadata
 import com.couchlist.app.core.domain.model.WatchProvider
 import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.SettingsRepository
@@ -41,6 +46,15 @@ class TmdbMediaRepository @Inject constructor(
                 MediaType.TV -> api.tv(id).toDomain(mediaType, providers)
             }
             Result.success(detail)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
+    override suspend fun seasonDetails(tvId: Long, seasonNumber: Int): Result<SeasonDetails> =
+        try {
+            Result.success(api.tvSeason(tvId, seasonNumber).toDomain())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -94,6 +108,37 @@ class TmdbMediaRepository @Inject constructor(
         providers = providers,
     )
 
+    private fun TvSeasonDetailDto.toDomain() = SeasonDetails(
+        season = SeasonMetadata(
+            seasonNumber = seasonNumber,
+            name = name,
+            overview = overview,
+            posterPath = posterPath,
+            airDate = airDate,
+            episodeCount = episodes.size,
+        ),
+        episodes = episodes.map { episode ->
+            EpisodeMetadata(
+                seasonNumber = episode.seasonNumber,
+                episodeNumber = episode.episodeNumber,
+                title = episode.name,
+                overview = episode.overview,
+                stillPath = episode.stillPath,
+                airDate = episode.airDate,
+                runtimeMinutes = episode.runtime,
+            )
+        },
+    )
+
+    private fun SeasonSummaryDto.toDomain() = SeasonMetadata(
+        seasonNumber = seasonNumber,
+        name = name,
+        overview = overview,
+        posterPath = posterPath,
+        airDate = airDate,
+        episodeCount = episodeCount,
+    )
+
     private fun TvDetailDto.toDomain(
         mediaType: MediaType,
         providers: List<WatchProvider>,
@@ -112,6 +157,7 @@ class TmdbMediaRepository @Inject constructor(
         voteCount = voteCount,
         genres = genres.map { it.name },
         providers = providers,
+        seasons = seasons.map { it.toDomain() },
     )
 
     private fun String?.toYear(): Int? =

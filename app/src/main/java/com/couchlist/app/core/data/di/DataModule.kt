@@ -11,13 +11,16 @@ import com.couchlist.app.core.data.local.SEED_DEFAULT_LISTS_CALLBACK
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
+import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
 import com.couchlist.app.core.data.repository.PreferencesSettingsRepository
+import com.couchlist.app.core.data.repository.TvRepositoryImpl
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.SettingsRepository
+import com.couchlist.app.core.domain.repository.TvRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -68,6 +71,10 @@ object DataModule {
 
     @Provides
     @Singleton
+    fun provideTvDao(database: CouchlistDatabase): TvDao = database.tvDao()
+
+    @Provides
+    @Singleton
     fun provideLibraryRepository(
         database: CouchlistDatabase,
         libraryItemDao: LibraryItemDao,
@@ -77,7 +84,25 @@ object DataModule {
     @Provides
     @Singleton
     fun provideCatalogRepository(
+        database: CouchlistDatabase,
         mediaItemDao: MediaItemDao,
+        tvDao: TvDao,
         mediaRepository: MediaRepository,
-    ): CatalogRepository = CatalogRepositoryImpl(mediaItemDao, mediaRepository)
+    ): CatalogRepository = CatalogRepositoryImpl(database, mediaItemDao, tvDao, mediaRepository)
+
+    @Provides
+    @Singleton
+    fun provideTvRepository(
+        database: CouchlistDatabase,
+        mediaItemDao: MediaItemDao,
+        libraryItemDao: LibraryItemDao,
+        tvDao: TvDao,
+        mediaRepository: MediaRepository,
+    ): TvRepository = TvRepositoryImpl(
+        database,
+        mediaItemDao,
+        libraryItemDao,
+        tvDao,
+        mediaRepository,
+    )
 }

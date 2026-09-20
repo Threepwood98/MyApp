@@ -15,6 +15,7 @@ data class MediaDetail(
     val voteCount: Long,
     val genres: List<String>,
     val providers: List<WatchProvider>,
+    val seasons: List<SeasonMetadata> = emptyList(),
 ) {
     val releaseYear: Int?
         get() = releaseDate?.takeIf { it.length >= 4 }?.take(4)?.toIntOrNull()

@@ -82,6 +82,12 @@ interface LibraryItemDao {
         updatedAt: Long,
     )
 
+    @Query(
+        "UPDATE library_items SET progress = :progress, updated_at = :updatedAt " +
+            "WHERE media_id = :mediaId",
+    )
+    suspend fun updateProgress(mediaId: Long, progress: Double?, updatedAt: Long)
+
     @Query("DELETE FROM library_items WHERE id = :id")
     suspend fun delete(id: Long)
 }

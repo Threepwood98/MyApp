@@ -15,17 +15,23 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -46,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -55,6 +62,8 @@ import com.couchlist.app.core.domain.model.MediaDetail
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.model.ProviderCategory
+import com.couchlist.app.core.domain.model.TvEpisode
+import com.couchlist.app.core.domain.model.TvSeason
 import com.couchlist.app.core.domain.model.WatchProvider
 import com.couchlist.app.core.ui.components.TmdbImages
 import com.couchlist.app.core.ui.theme.CouchlistTheme
@@ -118,6 +127,9 @@ fun DetailRoute(
                     onAddToWatchlist = viewModel::onAddToWatchlist,
                     onSetStatus = viewModel::onSetStatus,
                     onRemoveFromWatchlist = viewModel::onRemoveFromWatchlist,
+                    onSeasonSelected = viewModel::onSeasonSelected,
+                    onEpisodeWatchedChange = viewModel::onEpisodeWatchedChange,
+                    onRetrySeason = viewModel::onRetrySeason,
                 )
 
                 else -> DetailErrorState(
@@ -136,6 +148,9 @@ private fun DetailContent(
     onAddToWatchlist: () -> Unit,
     onSetStatus: (MediaStatus) -> Unit,
     onRemoveFromWatchlist: () -> Unit,
+    onSeasonSelected: (Int) -> Unit,
+    onEpisodeWatchedChange: (TvEpisode, Boolean) -> Unit,
+    onRetrySeason: () -> Unit,
 ) {
     val detail = uiState.detail ?: return
     Column(
@@ -212,8 +227,8 @@ private fun DetailContent(
                     Text(text = "Add to Watchlist")
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MediaStatus.entries.forEach { status ->
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(MediaStatus.entries) { status ->
                         FilterChip(
                             selected = uiState.status == status,
                             onClick = { onSetStatus(status) },
@@ -225,6 +240,19 @@ private fun DetailContent(
                     Text(text = "Remove from lists")
                 }
             }
+            if (detail.mediaType == MediaType.TV && uiState.seasons.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                uiState.nextUnwatchedEpisode?.let { episode ->
+                    NextUnwatchedBanner(episode = episode)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+                EpisodeTrackingSection(
+                    uiState = uiState,
+                    onSeasonSelected = onSeasonSelected,
+                    onEpisodeWatchedChange = onEpisodeWatchedChange,
+                    onRetry = onRetrySeason,
+                )
+            }
             if (detail.providers.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
@@ -234,6 +262,223 @@ private fun DetailContent(
                 detail.providers.groupBy { it.category }.forEach { (category, providers) ->
                     ProviderRow(label = category.displayName, providers = providers)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeTrackingSection(
+    uiState: DetailUiState,
+    onSeasonSelected: (Int) -> Unit,
+    onEpisodeWatchedChange: (TvEpisode, Boolean) -> Unit,
+    onRetry: () -> Unit,
+) {
+    val selectedSeason = uiState.seasons.firstOrNull {
+        it.seasonNumber == uiState.selectedSeasonNumber
+    }
+    val progress = uiState.tvProgress
+
+    Text(text = "Episodes", style = MaterialTheme.typography.titleLarge)
+    if (progress.totalEpisodes > 0) {
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "${progress.watchedEpisodes} of ${progress.totalEpisodes} episodes watched",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { progress.fraction?.toFloat() ?: 0f },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    if (uiState.entryId == null) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Add this show to your Watchlist to track watched episodes.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Spacer(modifier = Modifier.height(16.dp))
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(uiState.seasons, key = { it.id }) { season ->
+            FilterChip(
+                selected = season.seasonNumber == uiState.selectedSeasonNumber,
+                onClick = { onSeasonSelected(season.seasonNumber) },
+                label = { Text(season.displayName) },
+            )
+        }
+    }
+    if (selectedSeason != null) {
+        Spacer(modifier = Modifier.height(16.dp))
+        SeasonHeader(selectedSeason, uiState.episodes)
+    }
+    when {
+        uiState.isSeasonLoading && uiState.episodes.isEmpty() -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(28.dp))
+            }
+        }
+
+        uiState.seasonErrorMessage != null && uiState.episodes.isEmpty() -> {
+            Text(
+                text = uiState.seasonErrorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            TextButton(onClick = onRetry) { Text("Try again") }
+        }
+
+        else -> {
+            uiState.episodes.forEach { episode ->
+                EpisodeCard(
+                    episode = episode,
+                    trackingEnabled = uiState.entryId != null,
+                    isUpdating = episode.id in uiState.updatingEpisodeIds,
+                    onWatchedChange = { watched -> onEpisodeWatchedChange(episode, watched) },
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+            if (uiState.seasonErrorMessage != null) {
+                Text(
+                    text = "Couldn't refresh this season. Showing saved episodes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onRetry) { Text("Retry") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeasonHeader(season: TvSeason, episodes: List<TvEpisode>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = season.name, style = MaterialTheme.typography.titleMedium)
+            season.airDate?.let { airDate ->
+                Text(
+                    text = airDate,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            text = "${episodes.count { it.isWatched }} / ${season.episodeCount}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    Spacer(modifier = Modifier.height(10.dp))
+}
+
+@Composable
+private fun EpisodeCard(
+    episode: TvEpisode,
+    trackingEnabled: Boolean,
+    isUpdating: Boolean,
+    onWatchedChange: (Boolean) -> Unit,
+) {
+    val enabled = trackingEnabled && !isUpdating
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (episode.isWatched) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = episode.isWatched,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onValueChange = onWatchedChange,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AsyncImage(
+                model = TmdbImages.stillUrl(episode.stillPath),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(112.dp)
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${episode.episodeNumber}. ${episode.title}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val metadata = listOfNotNull(
+                    episode.airDate,
+                    episode.runtimeMinutes?.let { "$it min" },
+                ).joinToString(" · ")
+                if (metadata.isNotBlank()) {
+                    Text(
+                        text = metadata,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Checkbox(
+                checked = episode.isWatched,
+                onCheckedChange = null,
+                enabled = enabled,
+            )
+        }
+    }
+}
+
+private val TvSeason.displayName: String
+    get() = if (seasonNumber == 0) "Specials" else "Season $seasonNumber"
+
+@Composable
+private fun NextUnwatchedBanner(episode: TvEpisode) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Next up",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = "S${episode.seasonNumber}E${episode.episodeNumber} — ${episode.title}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -367,6 +612,9 @@ private fun DetailContentPreview() {
             onAddToWatchlist = {},
             onSetStatus = {},
             onRemoveFromWatchlist = {},
+            onSeasonSelected = {},
+            onEpisodeWatchedChange = { _, _ -> },
+            onRetrySeason = {},
         )
     }
 }

@@ -33,6 +33,7 @@ data class TvDetailDto(
     @SerialName("vote_average") val voteAverage: Double = 0.0,
     @SerialName("vote_count") val voteCount: Long = 0,
     val genres: List<GenreDto> = emptyList(),
+    val seasons: List<SeasonSummaryDto> = emptyList(),
 )
 
 @Serializable

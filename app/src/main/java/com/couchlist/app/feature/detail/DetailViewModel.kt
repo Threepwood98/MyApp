@@ -7,18 +7,26 @@ import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaDetail
 import com.couchlist.app.core.domain.model.MediaItem
 import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.TvEpisode
+import com.couchlist.app.core.domain.model.TvProgress
+import com.couchlist.app.core.domain.model.TvSeason
 import com.couchlist.app.core.domain.model.WatchProvider
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.TvRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -27,6 +35,7 @@ class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val catalogRepository: CatalogRepository,
     private val libraryRepository: LibraryRepository,
+    private val tvRepository: TvRepository,
 ) : ViewModel() {
 
     private val mediaId: Long = savedStateHandle.get<Long>("mediaId") ?: -1L
@@ -38,6 +47,8 @@ class DetailViewModel @Inject constructor(
     val events: Flow<DetailEvent> = _events.receiveAsFlow()
 
     private val providers = MutableStateFlow<List<WatchProvider>>(emptyList())
+    private val selectedSeasonNumber = MutableStateFlow<Int?>(null)
+    private var seasonRefreshJob: Job? = null
 
     init {
         if (mediaId < 0L) {
@@ -46,12 +57,52 @@ class DetailViewModel @Inject constructor(
             }
         } else {
             observeDetail()
+            observeSeasons()
+            observeEpisodes()
+            observeProgress()
+            observeNextUnwatched()
             refresh()
         }
     }
 
     fun onRetry() {
         refresh()
+        selectedSeasonNumber.value?.let(::refreshSeason)
+    }
+
+    fun onSeasonSelected(seasonNumber: Int) {
+        if (selectedSeasonNumber.value == seasonNumber) return
+        selectedSeasonNumber.value = seasonNumber
+        _uiState.update {
+            it.copy(
+                selectedSeasonNumber = seasonNumber,
+                episodes = emptyList(),
+                isSeasonLoading = true,
+                seasonErrorMessage = null,
+            )
+        }
+        refreshSeason(seasonNumber)
+    }
+
+    fun onRetrySeason() {
+        selectedSeasonNumber.value?.let(::refreshSeason)
+    }
+
+    fun onEpisodeWatchedChange(episode: TvEpisode, watched: Boolean) {
+        if (_uiState.value.entryId == null) {
+            viewModelScope.launch {
+                _events.send(DetailEvent.ShowMessage("Add this show to your Watchlist to track episodes"))
+            }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(updatingEpisodeIds = it.updatingEpisodeIds + episode.id) }
+            tvRepository.setEpisodeWatched(episode.id, watched)
+                .onFailure { throwable ->
+                    _events.send(DetailEvent.ShowMessage(networkErrorMessage(throwable)))
+                }
+            _uiState.update { it.copy(updatingEpisodeIds = it.updatingEpisodeIds - episode.id) }
+        }
     }
 
     fun onAddToWatchlist() {
@@ -109,6 +160,57 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    private fun observeSeasons() {
+        viewModelScope.launch {
+            tvRepository.observeSeasons(mediaId).collect { seasons ->
+                val currentSelection = selectedSeasonNumber.value
+                val selection = currentSelection.takeIf { selected ->
+                    seasons.any { it.seasonNumber == selected }
+                } ?: seasons.defaultSeasonNumber()
+                _uiState.update {
+                    it.copy(
+                        seasons = seasons,
+                        selectedSeasonNumber = selection,
+                    )
+                }
+                if (selection != null && selection != currentSelection) {
+                    selectedSeasonNumber.value = selection
+                    refreshSeason(selection)
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeEpisodes() {
+        viewModelScope.launch {
+            selectedSeasonNumber
+                .filterNotNull()
+                .flatMapLatest { seasonNumber ->
+                    tvRepository.observeEpisodes(mediaId, seasonNumber)
+                }
+                .collect { episodes ->
+                    _uiState.update { it.copy(episodes = episodes) }
+                }
+        }
+    }
+
+    private fun observeProgress() {
+        viewModelScope.launch {
+            tvRepository.observeProgress(mediaId).collect { progress ->
+                _uiState.update { it.copy(tvProgress = progress) }
+            }
+        }
+    }
+
+    private fun observeNextUnwatched() {
+        viewModelScope.launch {
+            tvRepository.observeNextUnwatched(mediaId).collect { episode ->
+                _uiState.update { it.copy(nextUnwatchedEpisode = episode) }
+            }
+        }
+    }
+
     private fun refresh() {
         if (mediaId < 0L) return
         viewModelScope.launch {
@@ -142,6 +244,27 @@ class DetailViewModel @Inject constructor(
             }
         }
     }
+
+    private fun refreshSeason(seasonNumber: Int) {
+        seasonRefreshJob?.cancel()
+        seasonRefreshJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(isSeasonLoading = true, seasonErrorMessage = null)
+            }
+            tvRepository.refreshSeason(mediaId, seasonNumber)
+                .onSuccess {
+                    _uiState.update { it.copy(isSeasonLoading = false) }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isSeasonLoading = false,
+                            seasonErrorMessage = networkErrorMessage(throwable),
+                        )
+                    }
+                }
+        }
+    }
 }
 
 data class DetailUiState(
@@ -151,7 +274,20 @@ data class DetailUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val isOffline: Boolean = false,
+    val seasons: List<TvSeason> = emptyList(),
+    val selectedSeasonNumber: Int? = null,
+    val episodes: List<TvEpisode> = emptyList(),
+    val tvProgress: TvProgress = TvProgress(0, 0),
+    val nextUnwatchedEpisode: TvEpisode? = null,
+    val isSeasonLoading: Boolean = false,
+    val seasonErrorMessage: String? = null,
+    val updatingEpisodeIds: Set<Long> = emptySet(),
 )
+
+internal fun List<TvSeason>.defaultSeasonNumber(): Int? =
+    firstOrNull { it.seasonNumber == 1 }?.seasonNumber
+        ?: firstOrNull { it.seasonNumber > 0 }?.seasonNumber
+        ?: firstOrNull()?.seasonNumber
 
 private fun MediaItem.toDetail(providers: List<WatchProvider>) = MediaDetail(
     id = tmdbId,

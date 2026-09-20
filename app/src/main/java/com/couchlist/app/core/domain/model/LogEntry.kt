@@ -7,6 +7,7 @@ package com.couchlist.app.core.domain.model
 enum class LogAction {
     MOVIE_WATCHED,
     EPISODE_WATCHED,
+    EPISODE_UNWATCHED,
     COMPLETED,
 }
 

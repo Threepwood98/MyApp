@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
+import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.local.entity.EpisodeEntity
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
 import com.couchlist.app.core.data.local.entity.LogEntryEntity
@@ -34,4 +35,6 @@ abstract class CouchlistDatabase : RoomDatabase() {
     abstract fun libraryItemDao(): LibraryItemDao
 
     abstract fun mediaListDao(): MediaListDao
+
+    abstract fun tvDao(): TvDao
 }

@@ -1,7 +1,11 @@
 package com.couchlist.app.core.data.repository
 
+import androidx.room.withTransaction
+import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.dao.MediaItemDao
+import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
+import com.couchlist.app.core.data.local.entity.SeasonEntity
 import com.couchlist.app.core.domain.model.MediaItem
 import com.couchlist.app.core.domain.model.MediaSearchResult
 import com.couchlist.app.core.domain.model.WatchProvider
@@ -13,7 +17,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class CatalogRepositoryImpl @Inject constructor(
+    private val database: CouchlistDatabase,
     private val mediaItemDao: MediaItemDao,
+    private val tvDao: TvDao,
     private val mediaRepository: MediaRepository,
 ) : CatalogRepository {
 
@@ -57,22 +63,38 @@ class CatalogRepositoryImpl @Inject constructor(
             onSuccess = { detail ->
                 try {
                     val now = System.currentTimeMillis()
-                    mediaItemDao.updateMetadata(
-                        id = cached.id,
-                        title = detail.title,
-                        originalTitle = detail.originalTitle,
-                        overview = detail.overview,
-                        posterPath = detail.posterPath,
-                        backdropPath = detail.backdropPath,
-                        releaseDate = detail.releaseDate,
-                        originalLanguage = detail.originalLanguage,
-                        runtimeMinutes = detail.runtimeMinutes,
-                        externalRating = detail.voteAverage,
-                        externalVoteCount = detail.voteCount,
-                        genres = detail.genres.joinToString(),
-                        refreshedAt = now,
-                        updatedAt = now,
-                    )
+                    database.withTransaction {
+                        mediaItemDao.updateMetadata(
+                            id = cached.id,
+                            title = detail.title,
+                            originalTitle = detail.originalTitle,
+                            overview = detail.overview,
+                            posterPath = detail.posterPath,
+                            backdropPath = detail.backdropPath,
+                            releaseDate = detail.releaseDate,
+                            originalLanguage = detail.originalLanguage,
+                            runtimeMinutes = detail.runtimeMinutes,
+                            externalRating = detail.voteAverage,
+                            externalVoteCount = detail.voteCount,
+                            genres = detail.genres.joinToString(),
+                            refreshedAt = now,
+                            updatedAt = now,
+                        )
+                        detail.seasons.forEach { season ->
+                            tvDao.upsertSeason(
+                                SeasonEntity(
+                                    mediaId = cached.id,
+                                    seasonNumber = season.seasonNumber,
+                                    name = season.name,
+                                    overview = season.overview,
+                                    posterPath = season.posterPath,
+                                    airDate = season.airDate,
+                                    episodeCount = season.episodeCount,
+                                    lastRefreshedAt = now,
+                                ),
+                            )
+                        }
+                    }
                     Result.success(detail.providers)
                 } catch (e: CancellationException) {
                     throw e

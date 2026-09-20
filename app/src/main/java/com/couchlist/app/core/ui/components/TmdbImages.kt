@@ -9,6 +9,9 @@ object TmdbImages {
     fun backdropUrl(path: String?, size: String = "w780"): String? =
         path?.let { BASE_URL + size + it }
 
+    fun stillUrl(path: String?, size: String = "w300"): String? =
+        path?.let { BASE_URL + size + it }
+
     fun logoUrl(path: String?, size: String = "w92"): String? =
         path?.let { BASE_URL + size + it }
 }
