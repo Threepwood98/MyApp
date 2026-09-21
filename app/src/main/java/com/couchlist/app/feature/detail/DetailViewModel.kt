@@ -13,6 +13,7 @@ import com.couchlist.app.core.domain.model.TvSeason
 import com.couchlist.app.core.domain.model.WatchProvider
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.LogbookRepository
 import com.couchlist.app.core.domain.repository.TvRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -35,6 +36,7 @@ class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val catalogRepository: CatalogRepository,
     private val libraryRepository: LibraryRepository,
+    private val logbookRepository: LogbookRepository,
     private val tvRepository: TvRepository,
 ) : ViewModel() {
 
@@ -136,6 +138,21 @@ class DetailViewModel @Inject constructor(
                 libraryRepository.removeItem(entryId)
             }
             _events.send(DetailEvent.ShowMessage("Removed $title from your lists"))
+        }
+    }
+
+    fun onMarkWatched(rating: Int?, notes: String?) {
+        viewModelScope.launch {
+            val detail = _uiState.value.detail ?: return@launch
+            logbookRepository.logWatched(
+                mediaId = mediaId,
+                rating = rating,
+                notes = notes,
+            )
+            val state = _uiState.value
+            val entryId = state.entryId ?: libraryRepository.addToWatchlist(mediaId)
+            libraryRepository.moveItem(entryId, MediaStatus.COMPLETED)
+            _events.send(DetailEvent.ShowMessage("Logged ${detail.title} as watched"))
         }
     }
 

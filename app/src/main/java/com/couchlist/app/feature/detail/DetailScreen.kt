@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,7 +34,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -43,7 +46,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,6 +83,17 @@ fun DetailRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var showRatingDialog by remember { mutableStateOf(false) }
+
+    if (showRatingDialog) {
+        RatingNotesDialog(
+            onDismiss = { showRatingDialog = false },
+            onConfirm = { rating, notes ->
+                showRatingDialog = false
+                viewModel.onMarkWatched(rating, notes)
+            },
+        )
+    }
 
     LaunchedEffect(viewModel) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -127,6 +143,7 @@ fun DetailRoute(
                     onAddToWatchlist = viewModel::onAddToWatchlist,
                     onSetStatus = viewModel::onSetStatus,
                     onRemoveFromWatchlist = viewModel::onRemoveFromWatchlist,
+                    onMarkAsWatchedClick = { showRatingDialog = true },
                     onSeasonSelected = viewModel::onSeasonSelected,
                     onEpisodeWatchedChange = viewModel::onEpisodeWatchedChange,
                     onRetrySeason = viewModel::onRetrySeason,
@@ -148,6 +165,7 @@ private fun DetailContent(
     onAddToWatchlist: () -> Unit,
     onSetStatus: (MediaStatus) -> Unit,
     onRemoveFromWatchlist: () -> Unit,
+    onMarkAsWatchedClick: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeWatchedChange: (TvEpisode, Boolean) -> Unit,
     onRetrySeason: () -> Unit,
@@ -238,6 +256,15 @@ private fun DetailContent(
                 }
                 TextButton(onClick = onRemoveFromWatchlist) {
                     Text(text = "Remove from lists")
+                }
+            }
+            if (detail.mediaType == MediaType.MOVIE) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onMarkAsWatchedClick,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = "Mark as watched")
                 }
             }
             if (detail.mediaType == MediaType.TV && uiState.seasons.isNotEmpty()) {
@@ -577,6 +604,53 @@ private val ProviderCategory.displayName: String
         ProviderCategory.BUY -> "Buy"
     }
 
+@Composable
+private fun RatingNotesDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (rating: Int?, notes: String?) -> Unit,
+) {
+    var sliderValue by remember { mutableStateOf(5f) }
+    var notes by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate this title") },
+        text = {
+            Column {
+                Text(
+                    text = "Rating: ${sliderValue.toInt()} / 10",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    valueRange = 1f..10f,
+                    steps = 8,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(sliderValue.toInt(), notes.ifBlank { null })
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Skip")
+            }
+        },
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun DetailContentPreview() {
@@ -612,6 +686,7 @@ private fun DetailContentPreview() {
             onAddToWatchlist = {},
             onSetStatus = {},
             onRemoveFromWatchlist = {},
+            onMarkAsWatchedClick = {},
             onSeasonSelected = {},
             onEpisodeWatchedChange = { _, _ -> },
             onRetrySeason = {},

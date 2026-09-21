@@ -2,6 +2,7 @@ package com.couchlist.app.core.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.couchlist.app.feature.detail.DetailRoute as DetailScreen
 import com.couchlist.app.feature.home.HomeRoute
 import com.couchlist.app.feature.library.LibraryRoute as LibraryScreen
+import com.couchlist.app.feature.logbook.LogbookRoute as LogbookScreen
 import com.couchlist.app.feature.search.SearchRoute as SearchScreen
 import com.couchlist.app.feature.settings.SettingsRoute as SettingsScreen
 
@@ -37,6 +39,7 @@ fun CouchlistNavHost(
         TopLevelDestination(HomeRoute, "Home", Icons.Filled.Home),
         TopLevelDestination(SearchRoute, "Search", Icons.Filled.Search),
         TopLevelDestination(LibraryRoute, "Library", Icons.AutoMirrored.Filled.List),
+        TopLevelDestination(LogbookRoute, "Logbook", Icons.Filled.DateRange),
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -98,6 +101,9 @@ fun CouchlistNavHost(
                     onItemClick = { item -> navController.navigate(DetailRoute(item.media.id)) },
                 )
             }
+            composable<LogbookRoute> {
+                LogbookScreen()
+            }
             composable<SettingsRoute> {
                 SettingsScreen(onBack = { navController.popBackStack() })
             }
@@ -120,6 +126,7 @@ private fun NavDestination?.matches(route: Any): Boolean = when (route) {
     HomeRoute -> this?.hasRoute<HomeRoute>() == true
     SearchRoute -> this?.hasRoute<SearchRoute>() == true
     LibraryRoute -> this?.hasRoute<LibraryRoute>() == true
+    LogbookRoute -> this?.hasRoute<LogbookRoute>() == true
     else -> false
 }
 

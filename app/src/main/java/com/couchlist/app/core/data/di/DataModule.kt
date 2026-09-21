@@ -9,15 +9,18 @@ import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.MIGRATION_1_3
 import com.couchlist.app.core.data.local.SEED_DEFAULT_LISTS_CALLBACK
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
+import com.couchlist.app.core.data.local.dao.LogEntryDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
+import com.couchlist.app.core.data.repository.LogbookRepositoryImpl
 import com.couchlist.app.core.data.repository.PreferencesSettingsRepository
 import com.couchlist.app.core.data.repository.TvRepositoryImpl
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.LogbookRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.SettingsRepository
 import com.couchlist.app.core.domain.repository.TvRepository
@@ -75,6 +78,10 @@ object DataModule {
 
     @Provides
     @Singleton
+    fun provideLogEntryDao(database: CouchlistDatabase): LogEntryDao = database.logEntryDao()
+
+    @Provides
+    @Singleton
     fun provideLibraryRepository(
         database: CouchlistDatabase,
         libraryItemDao: LibraryItemDao,
@@ -105,4 +112,10 @@ object DataModule {
         tvDao,
         mediaRepository,
     )
+
+    @Provides
+    @Singleton
+    fun provideLogbookRepository(
+        logEntryDao: LogEntryDao,
+    ): LogbookRepository = LogbookRepositoryImpl(logEntryDao)
 }

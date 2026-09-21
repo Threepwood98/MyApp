@@ -26,3 +26,11 @@ data class LogEntry(
         require(personalRating == null || personalRating in 1..10)
     }
 }
+
+/** A log entry together with basic media info for display in the logbook. */
+data class LogMediaEntry(
+    val entry: LogEntry,
+    val mediaTitle: String,
+    val posterPath: String?,
+    val mediaType: MediaType,
+)

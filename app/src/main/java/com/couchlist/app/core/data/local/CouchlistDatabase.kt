@@ -3,6 +3,7 @@ package com.couchlist.app.core.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
+import com.couchlist.app.core.data.local.dao.LogEntryDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
@@ -35,6 +36,8 @@ abstract class CouchlistDatabase : RoomDatabase() {
     abstract fun libraryItemDao(): LibraryItemDao
 
     abstract fun mediaListDao(): MediaListDao
+
+    abstract fun logEntryDao(): LogEntryDao
 
     abstract fun tvDao(): TvDao
 }
