@@ -18,6 +18,9 @@ data object LibraryRoute
 data object LogbookRoute
 
 @Serializable
+data object StatisticsRoute
+
+@Serializable
 data class DetailRoute(
     val mediaId: Long,
 )

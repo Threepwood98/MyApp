@@ -17,12 +17,14 @@ import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
 import com.couchlist.app.core.data.repository.LogbookRepositoryImpl
 import com.couchlist.app.core.data.repository.PreferencesSettingsRepository
+import com.couchlist.app.core.data.repository.StatisticsRepositoryImpl
 import com.couchlist.app.core.data.repository.TvRepositoryImpl
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.LogbookRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.SettingsRepository
+import com.couchlist.app.core.domain.repository.StatisticsRepository
 import com.couchlist.app.core.domain.repository.TvRepository
 import dagger.Module
 import dagger.Provides
@@ -118,4 +120,11 @@ object DataModule {
     fun provideLogbookRepository(
         logEntryDao: LogEntryDao,
     ): LogbookRepository = LogbookRepositoryImpl(logEntryDao)
+
+    @Provides
+    @Singleton
+    fun provideStatisticsRepository(
+        logEntryDao: LogEntryDao,
+        mediaItemDao: MediaItemDao,
+    ): StatisticsRepository = StatisticsRepositoryImpl(logEntryDao, mediaItemDao)
 }

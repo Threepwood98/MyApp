@@ -58,6 +58,9 @@ titles and fetch details.
 - **Logbook.** Append-only watch history for movies and shows. Filter by All /
   Movies / TV. Each entry records when you watched something, with optional
   rating and notes.
+- **Statistics.** Watch stats derived from your logbook — movies watched,
+  episodes watched, unique titles, average rating, rating distribution
+  histogram, monthly activity bar chart, and top genres.
 - **Settings.** System/light/dark theme modes, dynamic-color control, streaming
   provider region, app version, and TMDB attribution.
 - **Theming.** Uses dynamic color on Android 12+ when enabled, with a warm
@@ -68,7 +71,7 @@ titles and fetch details.
 - **Language / UI:** Kotlin, Jetpack Compose (Material 3)
 - **Architecture:** MVVM with MVI-style UI state + one-shot effects
   (`StateFlow` + `Channel`)
-- **Navigation:** Bottom navigation with 4 tabs (Home, Search, Library, Logbook)
+- **Navigation:** Bottom navigation with 5 tabs (Home, Search, Library, Logbook, Stats)
   using Navigation Compose with type-safe `@Serializable` routes
 - **DI:** Hilt
 - **Local storage:** Room (offline-first catalog/library) + Preferences DataStore
@@ -129,7 +132,8 @@ app/src/main/java/com/couchlist/app/
     ├── library/             # Lists, status tabs, and undoable swipes
     ├── logbook/             # Watch history with filters
     ├── search/              # TMDB search
-    └── settings/            # About + TMDB attribution
+    ├── settings/            # About + TMDB attribution
+    └── statistics/          # Watch stats derived from logbook
 ```
 
 ## Notes

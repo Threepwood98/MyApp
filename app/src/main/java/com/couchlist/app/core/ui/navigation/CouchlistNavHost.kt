@@ -5,6 +5,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -29,6 +30,7 @@ import com.couchlist.app.feature.library.LibraryRoute as LibraryScreen
 import com.couchlist.app.feature.logbook.LogbookRoute as LogbookScreen
 import com.couchlist.app.feature.search.SearchRoute as SearchScreen
 import com.couchlist.app.feature.settings.SettingsRoute as SettingsScreen
+import com.couchlist.app.feature.statistics.StatisticsRoute as StatisticsScreen
 
 @Composable
 fun CouchlistNavHost(
@@ -40,6 +42,7 @@ fun CouchlistNavHost(
         TopLevelDestination(SearchRoute, "Search", Icons.Filled.Search),
         TopLevelDestination(LibraryRoute, "Library", Icons.AutoMirrored.Filled.List),
         TopLevelDestination(LogbookRoute, "Logbook", Icons.Filled.DateRange),
+        TopLevelDestination(StatisticsRoute, "Stats", Icons.Filled.Info),
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -104,6 +107,9 @@ fun CouchlistNavHost(
             composable<LogbookRoute> {
                 LogbookScreen()
             }
+            composable<StatisticsRoute> {
+                StatisticsScreen()
+            }
             composable<SettingsRoute> {
                 SettingsScreen(onBack = { navController.popBackStack() })
             }
@@ -127,6 +133,7 @@ private fun NavDestination?.matches(route: Any): Boolean = when (route) {
     SearchRoute -> this?.hasRoute<SearchRoute>() == true
     LibraryRoute -> this?.hasRoute<LibraryRoute>() == true
     LogbookRoute -> this?.hasRoute<LogbookRoute>() == true
+    StatisticsRoute -> this?.hasRoute<StatisticsRoute>() == true
     else -> false
 }
 

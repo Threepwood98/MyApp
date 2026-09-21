@@ -59,4 +59,11 @@ interface MediaItemDao {
         refreshedAt: Long,
         updatedAt: Long,
     )
+
+    @Query(
+        "SELECT media_items.genres FROM media_items " +
+            "INNER JOIN log_entries ON media_items.id = log_entries.media_id " +
+            "WHERE media_items.genres IS NOT NULL",
+    )
+    suspend fun getWatchedGenres(): List<String>
 }
