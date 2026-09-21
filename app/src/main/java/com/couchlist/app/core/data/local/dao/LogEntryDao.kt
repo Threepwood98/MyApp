@@ -66,4 +66,13 @@ interface LogEntryDao {
             "GROUP BY month ORDER BY month",
     )
     fun observeMonthlyActivity(sinceTimestamp: Long): Flow<List<MonthCount>>
+
+    @Query("SELECT * FROM log_entries")
+    suspend fun getAll(): List<LogEntryEntity>
+
+    @Insert
+    suspend fun insertAll(entries: List<LogEntryEntity>): List<Long>
+
+    @Query("DELETE FROM log_entries")
+    suspend fun deleteAll()
 }

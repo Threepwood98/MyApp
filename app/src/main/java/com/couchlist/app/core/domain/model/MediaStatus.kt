@@ -1,5 +1,8 @@
 package com.couchlist.app.core.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class MediaStatus(val displayName: String) {
     BACKLOG("Backlog"),
     WATCHING("Watching"),

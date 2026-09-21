@@ -111,4 +111,13 @@ interface LibraryItemDao {
 
     @Query("SELECT media_id FROM library_items")
     fun observeAllMediaIds(): Flow<List<Long>>
+
+    @Query("SELECT * FROM library_items")
+    suspend fun getAll(): List<LibraryItemEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(items: List<LibraryItemEntity>): List<Long>
+
+    @Query("DELETE FROM library_items")
+    suspend fun deleteAll()
 }

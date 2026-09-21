@@ -1,5 +1,8 @@
 package com.couchlist.app.core.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class MediaListType {
     PILE,
     TODO,
@@ -11,6 +14,7 @@ enum class MediaListType {
  * A named collection a media item can belong to. Membership is independent from
  * [MediaStatus]; a media item may be in any number of lists.
  */
+@Serializable
 data class MediaList(
     val id: Long,
     val name: String,

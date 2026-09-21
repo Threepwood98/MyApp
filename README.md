@@ -64,8 +64,12 @@ titles and fetch details.
 - **Statistics.** Watch stats derived from your logbook — movies watched,
   episodes watched, unique titles, average rating, rating distribution
   histogram, monthly activity bar chart, and top genres.
+- **Import/Export.** Save your entire library (media items, lists, memberships,
+  log history) to a portable JSON file and restore it later. Uses Android's
+  Storage Access Framework for file picking.
 - **Settings.** System/light/dark theme modes, dynamic-color control, streaming
-  provider region, app version, and TMDB attribution.
+  provider region, **export/import library** (JSON), app version, and TMDB
+  attribution.
 - **Theming.** Uses dynamic color on Android 12+ when enabled, with a warm
   "couch" palette as the fallback.
 

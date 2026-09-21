@@ -66,4 +66,13 @@ interface MediaItemDao {
             "WHERE media_items.genres IS NOT NULL",
     )
     suspend fun getWatchedGenres(): List<String>
+
+    @Query("SELECT * FROM media_items")
+    suspend fun getAll(): List<MediaItemEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(items: List<MediaItemEntity>): List<Long>
+
+    @Query("DELETE FROM media_items")
+    suspend fun deleteAll()
 }

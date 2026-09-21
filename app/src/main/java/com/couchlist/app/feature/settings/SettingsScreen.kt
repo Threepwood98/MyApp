@@ -1,5 +1,8 @@
 package com.couchlist.app.feature.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,10 +12,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,11 +28,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +47,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.couchlist.app.BuildConfig
 import com.couchlist.app.core.domain.model.AppSettings
 import com.couchlist.app.core.domain.model.ThemeMode
@@ -51,12 +63,67 @@ fun SettingsRoute(
     onBack: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var showImportConfirmDialog by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        uri?.let { viewModel.onExportToFile(it) }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let { viewModel.onImportFromFile(it) }
+    }
+
+    if (showImportConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirmDialog = false },
+            title = { Text("Import library") },
+            text = { Text("This will replace your entire library with the imported data. This cannot be undone. Continue?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImportConfirmDialog = false
+                    importLauncher.launch(arrayOf("application/json"))
+                }) {
+                    Text("Import")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    LaunchedEffect(viewModel) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.events.collect { event ->
+                when (event) {
+                    is SettingsEvent.ShowMessage -> {
+                        snackbarHostState.showSnackbar(
+                            message = event.message,
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     SettingsContent(
         settings = uiState,
+        snackbarHostState = snackbarHostState,
         onBack = onBack,
         onThemeModeChange = viewModel::onThemeModeChange,
         onDynamicColorChange = viewModel::onDynamicColorChange,
         onProviderRegionChange = viewModel::onProviderRegionChange,
+        onExport = { exportLauncher.launch("couchlist_export.json") },
+        onImport = { showImportConfirmDialog = true },
     )
 }
 
@@ -64,10 +131,13 @@ fun SettingsRoute(
 @Composable
 private fun SettingsContent(
     settings: AppSettings,
+    snackbarHostState: SnackbarHostState = SnackbarHostState(),
     onBack: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onProviderRegionChange: (String) -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -83,6 +153,7 @@ private fun SettingsContent(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -136,6 +207,22 @@ private fun SettingsContent(
                         onRegionSelected = onProviderRegionChange,
                     )
                 },
+            )
+            HorizontalDivider()
+            SectionHeader(text = "Data")
+            ListItem(
+                headlineContent = { Text(text = "Export library") },
+                supportingContent = {
+                    Text(text = "Save your library to a JSON file.")
+                },
+                modifier = Modifier.clickable { onExport() },
+            )
+            ListItem(
+                headlineContent = { Text(text = "Import library") },
+                supportingContent = {
+                    Text(text = "Load a previously exported JSON file. Replaces current data.")
+                },
+                modifier = Modifier.clickable { onImport() },
             )
             HorizontalDivider()
             SectionHeader(text = "About")
@@ -220,6 +307,8 @@ private fun SettingsPreview() {
             onThemeModeChange = {},
             onDynamicColorChange = {},
             onProviderRegionChange = {},
+            onExport = {},
+            onImport = {},
         )
     }
 }

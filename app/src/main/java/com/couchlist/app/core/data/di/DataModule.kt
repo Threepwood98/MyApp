@@ -14,12 +14,14 @@ import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
+import com.couchlist.app.core.data.repository.ExportImportRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
 import com.couchlist.app.core.data.repository.LogbookRepositoryImpl
 import com.couchlist.app.core.data.repository.PreferencesSettingsRepository
 import com.couchlist.app.core.data.repository.StatisticsRepositoryImpl
 import com.couchlist.app.core.data.repository.TvRepositoryImpl
 import com.couchlist.app.core.domain.repository.CatalogRepository
+import com.couchlist.app.core.domain.repository.ExportImportRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.LogbookRepository
 import com.couchlist.app.core.domain.repository.MediaRepository
@@ -127,4 +129,20 @@ object DataModule {
         logEntryDao: LogEntryDao,
         mediaItemDao: MediaItemDao,
     ): StatisticsRepository = StatisticsRepositoryImpl(logEntryDao, mediaItemDao)
+
+    @Provides
+    @Singleton
+    fun provideExportImportRepository(
+        database: CouchlistDatabase,
+        mediaItemDao: MediaItemDao,
+        libraryItemDao: LibraryItemDao,
+        mediaListDao: MediaListDao,
+        logEntryDao: LogEntryDao,
+    ): ExportImportRepository = ExportImportRepositoryImpl(
+        database,
+        mediaItemDao,
+        libraryItemDao,
+        mediaListDao,
+        logEntryDao,
+    )
 }

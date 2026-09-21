@@ -52,4 +52,22 @@ interface MediaListDao {
 
     @Query("SELECT * FROM lists WHERE id = :listId")
     suspend fun getListById(listId: Long): MediaListEntity?
+
+    @Query("SELECT * FROM lists")
+    suspend fun getAllLists(): List<MediaListEntity>
+
+    @Query("SELECT * FROM media_list_joins")
+    suspend fun getAllJoins(): List<MediaListJoinEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllLists(lists: List<MediaListEntity>): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllJoins(joins: List<MediaListJoinEntity>): List<Long>
+
+    @Query("DELETE FROM media_list_joins")
+    suspend fun deleteAllJoins()
+
+    @Query("DELETE FROM lists")
+    suspend fun deleteAllLists()
 }

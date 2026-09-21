@@ -1,9 +1,12 @@
 package com.couchlist.app.core.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * What a logbook entry represents. The logbook is append-only: re-watching or
  * re-reviewing creates a new entry rather than overwriting a previous one.
  */
+@Serializable
 enum class LogAction {
     MOVIE_WATCHED,
     EPISODE_WATCHED,
