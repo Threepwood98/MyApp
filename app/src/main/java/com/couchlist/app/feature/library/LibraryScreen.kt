@@ -21,7 +21,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -42,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +87,7 @@ import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.SmartFilter
 import com.couchlist.app.core.domain.model.nextStatus
 import com.couchlist.app.core.ui.components.TmdbImages
 
@@ -94,13 +101,28 @@ fun LibraryRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var showCreateListDialog by remember { mutableStateOf(false) }
+    var showSmartFilterDialog by remember { mutableStateOf(false) }
 
     if (showCreateListDialog) {
         CreateListDialog(
             onDismiss = { showCreateListDialog = false },
             onConfirm = { name, description, type ->
                 showCreateListDialog = false
-                viewModel.onCreateList(name, description, type)
+                if (type == MediaListType.SMART_LIST) {
+                    showSmartFilterDialog = true
+                } else {
+                    viewModel.onCreateList(name, description, type)
+                }
+            },
+        )
+    }
+
+    if (showSmartFilterDialog) {
+        SmartFilterDialog(
+            onDismiss = { showSmartFilterDialog = false },
+            onConfirm = { name, description, filter ->
+                showSmartFilterDialog = false
+                viewModel.onCreateSmartList(name, description, filter)
             },
         )
     }
@@ -144,6 +166,8 @@ fun LibraryRoute(
         onStatusTabChanged = viewModel::onStatusTabChanged,
         onCreateListClick = { showCreateListDialog = true },
         onDeleteList = viewModel::onDeleteList,
+        onSmartListClick = viewModel::onSmartListClick,
+        onSmartListBack = viewModel::onSmartListBack,
     )
 }
 
@@ -165,6 +189,8 @@ private fun LibraryContent(
     onStatusTabChanged: (MediaStatus) -> Unit,
     onCreateListClick: () -> Unit,
     onDeleteList: (Long) -> Unit,
+    onSmartListClick: (Long) -> Unit,
+    onSmartListBack: () -> Unit,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val statuses = MediaStatus.entries
@@ -184,7 +210,31 @@ private fun LibraryContent(
 
     Scaffold(
         topBar = {
-            if (uiState.isMultiSelectMode) {
+            if (uiState.selectedSmartListId != null) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            val listSummary = uiState.lists.find { it.list.id == uiState.selectedSmartListId }
+                            Text(text = listSummary?.list?.name ?: "Smart list")
+                            uiState.selectedSmartListFilter?.let { filter ->
+                                Text(
+                                    text = filter.description(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onSmartListBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
+                    },
+                )
+            } else if (uiState.isMultiSelectMode) {
                 TopAppBar(
                     title = { Text(text = "${uiState.selectedIds.size} selected") },
                     navigationIcon = {
@@ -238,7 +288,28 @@ private fun LibraryContent(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            if (uiState.lists.isNotEmpty() && !uiState.isMultiSelectMode) {
+            if (uiState.selectedSmartListId != null && uiState.selectedSmartListFilter != null) {
+                val filter = uiState.selectedSmartListFilter
+                val smartItems = uiState.items.filter { filter.matches(it) }.let { items ->
+                    when (uiState.sortOption) {
+                        SortOption.DATE_ADDED -> items.sortedByDescending { it.library.addedAt }
+                        SortOption.TITLE -> items.sortedBy { it.media.title.lowercase() }
+                        SortOption.RATING -> items.sortedByDescending { it.library.personalRating ?: 0 }
+                    }
+                }
+                SortBar(
+                    selectedOption = uiState.sortOption,
+                    onOptionSelected = onSortSelected,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                SmartListContent(
+                    items = smartItems,
+                    onItemClick = onItemClick,
+                    onItemLongClick = onMultiSelectEnter,
+                    modifier = Modifier.weight(1f),
+                )
+            } else if (uiState.lists.isNotEmpty() && !uiState.isMultiSelectMode) {
                 Text(
                     text = "Your lists",
                     style = MaterialTheme.typography.titleLarge,
@@ -254,6 +325,11 @@ private fun LibraryContent(
                         ListSummaryCard(
                             summary = summary,
                             onDelete = { onDeleteList(summary.list.id) },
+                            onClick = {
+                                if (summary.list.type == MediaListType.SMART_LIST) {
+                                    onSmartListClick(summary.list.id)
+                                }
+                            },
                         )
                     }
                 }
@@ -314,12 +390,13 @@ private fun SortBar(
 private fun ListSummaryCard(
     summary: MediaListSummary,
     onDelete: () -> Unit,
+    onClick: () -> Unit = {},
 ) {
     var showMenu by remember { mutableStateOf(false) }
     ElevatedCard(modifier = Modifier.width(172.dp)) {
         Column(
             modifier = Modifier
-                .clickable { }
+                .clickable { onClick() }
                 .padding(16.dp),
         ) {
             Row(
@@ -433,6 +510,46 @@ private fun StatusList(
                         onDismissed = { dismissedItems[item.library.id] = true },
                     )
                 }
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmartListContent(
+    items: List<LibraryMedia>,
+    onItemClick: (LibraryMedia) -> Unit,
+    onItemLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (items.isEmpty()) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "No matching titles",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Adjust your smart list filters",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else {
+        LazyColumn(modifier = modifier.fillMaxSize()) {
+            items(items, key = { it.library.id }) { item ->
+                LibraryMediaRow(
+                    item = item,
+                    onClick = { onItemClick(item) },
+                    onLongClick = onItemLongClick,
+                )
                 HorizontalDivider()
             }
         }
@@ -675,6 +792,11 @@ private fun CreateListDialog(
                         onClick = { selectedType = MediaListType.COLLECTION },
                         label = { Text("Collection") },
                     )
+                    FilterChip(
+                        selected = selectedType == MediaListType.SMART_LIST,
+                        onClick = { selectedType = MediaListType.SMART_LIST },
+                        label = { Text("Smart") },
+                    )
                 }
             }
         },
@@ -686,6 +808,135 @@ private fun CreateListDialog(
                             name.trim(),
                             description.trim().ifBlank { null },
                             selectedType,
+                        )
+                    }
+                },
+                enabled = name.isNotBlank(),
+            ) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun SmartFilterDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, description: String?, filter: SmartFilter) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var selectedStatuses by remember { mutableStateOf(setOf<MediaStatus>()) }
+    var minRating by remember { mutableFloatStateOf(1f) }
+    var useRatingFilter by remember { mutableStateOf(false) }
+    var favoriteOnly by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create smart list") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("List name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Filter by status",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Leave empty to match all statuses",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                MediaStatus.entries.forEach { status ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Checkbox(
+                            checked = status in selectedStatuses,
+                            onCheckedChange = { checked ->
+                                selectedStatuses = if (checked) {
+                                    selectedStatuses + status
+                                } else {
+                                    selectedStatuses - status
+                                }
+                            },
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = status.displayName)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Checkbox(
+                        checked = useRatingFilter,
+                        onCheckedChange = { useRatingFilter = it },
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Filter by rating")
+                }
+                if (useRatingFilter) {
+                    Text(
+                        text = "Minimum rating: ${minRating.toInt()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Slider(
+                        value = minRating,
+                        onValueChange = { minRating = it },
+                        valueRange = 1f..10f,
+                        steps = 8,
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Checkbox(
+                        checked = favoriteOnly,
+                        onCheckedChange = { favoriteOnly = it },
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Favorites only")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        val filter = SmartFilter(
+                            statuses = selectedStatuses.takeIf { it.isNotEmpty() },
+                            minRating = if (useRatingFilter) minRating.toInt() else null,
+                            favoriteOnly = if (favoriteOnly) true else null,
+                        )
+                        onConfirm(
+                            name.trim(),
+                            description.trim().ifBlank { null },
+                            filter,
                         )
                     }
                 },

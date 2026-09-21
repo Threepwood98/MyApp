@@ -37,7 +37,12 @@ interface LibraryRepository {
 
     fun observeAllMediaIds(): Flow<Set<Long>>
 
-    suspend fun createList(name: String, description: String?, type: MediaListType): Long
+    suspend fun createList(
+        name: String,
+        description: String?,
+        type: MediaListType,
+        smartFilterJson: String? = null,
+    ): Long
 
     suspend fun deleteList(listId: Long)
 
@@ -48,4 +53,8 @@ interface LibraryRepository {
     fun observeListMediaIds(listId: Long): Flow<List<Long>>
 
     suspend fun getListName(listId: Long): String?
+
+    suspend fun getSmartFilterJson(listId: Long): String?
+
+    fun observeSmartListItems(listId: Long): Flow<List<LibraryMedia>>
 }

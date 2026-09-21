@@ -26,10 +26,13 @@ titles and fetch details.
 
 - **Home dashboard.** Continue Watching, Recently Added, and Recently Completed
   sections keep the most useful titles close.
-- **Library.** Custom lists (TODO or Collection type) with item counts, plus
-  Backlog / Watching / Completed / Abandoned status tabs.
+- **Library.** Custom lists (TODO, Collection, or Smart type) with item counts,
+  plus Backlog / Watching / Completed / Abandoned status tabs.
   - **Create lists** via the FAB — give it a name, optional description, and
-    choose TODO or Collection type.
+    choose TODO, Collection, or Smart type.
+  - **Smart lists** auto-populate titles matching filter criteria — filter by
+    status, minimum rating, and favorites only. Tap a smart list card to see
+    its filtered results.
   - **Delete lists** from the overflow menu on each list card.
   - **Sort** by Date added, Title, or Rating using the filter chips.
   - **Multi-select** — long-press any item to enter selection mode, then batch

@@ -4,6 +4,7 @@ enum class MediaListType {
     PILE,
     TODO,
     COLLECTION,
+    SMART_LIST,
 }
 
 /**

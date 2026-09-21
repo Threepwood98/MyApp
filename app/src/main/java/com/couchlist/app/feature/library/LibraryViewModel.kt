@@ -8,6 +8,7 @@ import com.couchlist.app.core.domain.model.LibraryRemoval
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.SmartFilter
 import com.couchlist.app.core.domain.model.nextStatus
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -154,9 +155,32 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun onCreateSmartList(name: String, description: String?, filter: SmartFilter) {
+        viewModelScope.launch {
+            val json = SmartFilter.toJson(filter)
+            repository.createList(name, description, MediaListType.SMART_LIST, json)
+            _events.send(LibraryEvent.ShowMessage("Created smart list \"$name\""))
+        }
+    }
+
+    fun onSmartListClick(listId: Long) {
+        viewModelScope.launch {
+            val json = repository.getSmartFilterJson(listId)
+            val filter = SmartFilter.fromJson(json) ?: return@launch
+            _uiState.update { it.copy(selectedSmartListId = listId, selectedSmartListFilter = filter) }
+        }
+    }
+
+    fun onSmartListBack() {
+        _uiState.update { it.copy(selectedSmartListId = null, selectedSmartListFilter = null) }
+    }
+
     fun onDeleteList(listId: Long) {
         viewModelScope.launch {
             repository.deleteList(listId)
+            if (_uiState.value.selectedSmartListId == listId) {
+                _uiState.update { it.copy(selectedSmartListId = null, selectedSmartListFilter = null) }
+            }
             _events.send(LibraryEvent.ShowMessage("List deleted"))
         }
     }
@@ -183,6 +207,8 @@ data class LibraryUiState(
     val currentStatusTab: MediaStatus = MediaStatus.BACKLOG,
     val isMultiSelectMode: Boolean = false,
     val selectedIds: Set<Long> = emptySet(),
+    val selectedSmartListId: Long? = null,
+    val selectedSmartListFilter: SmartFilter? = null,
 )
 
 enum class SortOption(val displayName: String) {

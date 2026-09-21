@@ -14,6 +14,7 @@ import com.couchlist.app.core.domain.model.ListMembership
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.SmartFilter
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -148,6 +149,7 @@ class LibraryRepositoryImpl @Inject constructor(
         name: String,
         description: String?,
         type: MediaListType,
+        smartFilterJson: String?,
     ): Long {
         val now = System.currentTimeMillis()
         val insertedId = mediaListDao.insertListIgnore(
@@ -158,7 +160,7 @@ class LibraryRepositoryImpl @Inject constructor(
                 coverMediaId = null,
                 isPinned = false,
                 sortOrder = 99,
-                smartFilterJson = null,
+                smartFilterJson = smartFilterJson,
                 createdAt = now,
                 updatedAt = now,
             ),
@@ -190,6 +192,12 @@ class LibraryRepositoryImpl @Inject constructor(
 
     override suspend fun getListName(listId: Long): String? =
         mediaListDao.getListById(listId)?.name
+
+    override suspend fun getSmartFilterJson(listId: Long): String? =
+        mediaListDao.getListById(listId)?.smartFilterJson
+
+    override fun observeSmartListItems(listId: Long): Flow<List<LibraryMedia>> =
+        libraryItemDao.observeAll().map { rows -> rows.map { it.toDomain() } }
 
     private suspend fun ensureList(
         name: String,
