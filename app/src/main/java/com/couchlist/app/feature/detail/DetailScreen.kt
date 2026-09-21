@@ -20,6 +20,9 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -34,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -84,6 +88,8 @@ fun DetailRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var showRatingDialog by remember { mutableStateOf(false) }
+    var showEditRatingDialog by remember { mutableStateOf(false) }
+    var showEditNotesDialog by remember { mutableStateOf(false) }
 
     if (showRatingDialog) {
         RatingNotesDialog(
@@ -91,6 +97,28 @@ fun DetailRoute(
             onConfirm = { rating, notes ->
                 showRatingDialog = false
                 viewModel.onMarkWatched(rating, notes)
+            },
+        )
+    }
+
+    if (showEditRatingDialog) {
+        EditRatingDialog(
+            currentRating = uiState.personalRating,
+            onDismiss = { showEditRatingDialog = false },
+            onConfirm = { rating ->
+                showEditRatingDialog = false
+                viewModel.onSetRating(rating)
+            },
+        )
+    }
+
+    if (showEditNotesDialog) {
+        EditNotesDialog(
+            currentNotes = uiState.notes,
+            onDismiss = { showEditNotesDialog = false },
+            onConfirm = { notes ->
+                showEditNotesDialog = false
+                viewModel.onSetNotes(notes)
             },
         )
     }
@@ -116,6 +144,17 @@ fun DetailRoute(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                         )
+                    }
+                },
+                actions = {
+                    if (uiState.status != null) {
+                        IconButton(onClick = viewModel::onToggleFavorite) {
+                            Icon(
+                                imageVector = if (uiState.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = if (uiState.favorite) "Remove from favorites" else "Add to favorites",
+                                tint = if (uiState.favorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
             )
@@ -144,6 +183,9 @@ fun DetailRoute(
                     onSetStatus = viewModel::onSetStatus,
                     onRemoveFromWatchlist = viewModel::onRemoveFromWatchlist,
                     onMarkAsWatchedClick = { showRatingDialog = true },
+                    onEditRating = { showEditRatingDialog = true },
+                    onEditNotes = { showEditNotesDialog = true },
+                    onRewatch = viewModel::onRewatch,
                     onSeasonSelected = viewModel::onSeasonSelected,
                     onEpisodeWatchedChange = viewModel::onEpisodeWatchedChange,
                     onRetrySeason = viewModel::onRetrySeason,
@@ -166,6 +208,9 @@ private fun DetailContent(
     onSetStatus: (MediaStatus) -> Unit,
     onRemoveFromWatchlist: () -> Unit,
     onMarkAsWatchedClick: () -> Unit,
+    onEditRating: () -> Unit,
+    onEditNotes: () -> Unit,
+    onRewatch: () -> Unit,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeWatchedChange: (TvEpisode, Boolean) -> Unit,
     onRetrySeason: () -> Unit,
@@ -219,6 +264,18 @@ private fun DetailContent(
                     )
                 }
             }
+            if (uiState.status != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                PersonalRatingRow(
+                    rating = uiState.personalRating,
+                    onClick = onEditRating,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                NotesRow(
+                    notes = uiState.notes,
+                    onClick = onEditNotes,
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
             if (!detail.overview.isNullOrBlank()) {
                 Text(
@@ -265,6 +322,15 @@ private fun DetailContent(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(text = "Mark as watched")
+                }
+                if (uiState.status == MediaStatus.COMPLETED) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onRewatch,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = "Log rewatch")
+                    }
                 }
             }
             if (detail.mediaType == MediaType.TV && uiState.seasons.isNotEmpty()) {
@@ -651,7 +717,181 @@ private fun RatingNotesDialog(
     )
 }
 
-@Preview(showBackground = true)
+@Composable
+private fun PersonalRatingRow(
+    rating: Int?,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = if (rating != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Your rating",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (rating != null) {
+                    Text(
+                        text = "$rating / 10",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    Text(
+                        text = "Tap to rate",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.Filled.Edit,
+                contentDescription = "Edit rating",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotesRow(
+    notes: String?,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Edit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Notes",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (!notes.isNullOrBlank()) {
+                    Text(
+                        text = notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text(
+                        text = "Tap to add notes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditRatingDialog(
+    currentRating: Int?,
+    onDismiss: () -> Unit,
+    onConfirm: (rating: Int?) -> Unit,
+) {
+    var sliderValue by remember { mutableStateOf((currentRating ?: 5).toFloat()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate this title") },
+        text = {
+            Column {
+                Text(
+                    text = "Rating: ${sliderValue.toInt()} / 10",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    valueRange = 1f..10f,
+                    steps = 8,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(sliderValue.toInt()) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (currentRating != null) {
+                    TextButton(onClick = { onConfirm(null) }) {
+                        Text("Remove")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun EditNotesDialog(
+    currentNotes: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (notes: String?) -> Unit,
+) {
+    var notesText by remember { mutableStateOf(currentNotes.orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Notes") },
+        text = {
+            OutlinedTextField(
+                value = notesText,
+                onValueChange = { notesText = it },
+                label = { Text("Notes") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(notesText.ifBlank { null }) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
 @Composable
 private fun DetailContentPreview() {
     CouchlistTheme {
@@ -687,6 +927,9 @@ private fun DetailContentPreview() {
             onSetStatus = {},
             onRemoveFromWatchlist = {},
             onMarkAsWatchedClick = {},
+            onEditRating = {},
+            onEditNotes = {},
+            onRewatch = {},
             onSeasonSelected = {},
             onEpisodeWatchedChange = { _, _ -> },
             onRetrySeason = {},

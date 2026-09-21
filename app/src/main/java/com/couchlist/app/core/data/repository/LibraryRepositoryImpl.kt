@@ -129,6 +129,18 @@ class LibraryRepositoryImpl @Inject constructor(
     override suspend fun isInLibrary(mediaId: Long): Boolean =
         libraryItemDao.getByMediaId(mediaId) != null
 
+    override suspend fun updateFavorite(mediaId: Long, favorite: Boolean) {
+        libraryItemDao.updateFavorite(mediaId, favorite, System.currentTimeMillis())
+    }
+
+    override suspend fun updateRating(mediaId: Long, rating: Int?) {
+        libraryItemDao.updateRating(mediaId, rating, System.currentTimeMillis())
+    }
+
+    override suspend fun updateNotes(mediaId: Long, notes: String?) {
+        libraryItemDao.updateNotes(mediaId, notes, System.currentTimeMillis())
+    }
+
     private suspend fun ensureList(
         name: String,
         type: MediaListType,

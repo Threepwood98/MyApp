@@ -27,4 +27,10 @@ interface LibraryRepository {
     suspend fun restoreItemState(item: LibraryItem)
 
     suspend fun isInLibrary(mediaId: Long): Boolean
+
+    suspend fun updateFavorite(mediaId: Long, favorite: Boolean)
+
+    suspend fun updateRating(mediaId: Long, rating: Int?)
+
+    suspend fun updateNotes(mediaId: Long, notes: String?)
 }

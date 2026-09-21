@@ -156,6 +156,44 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    fun onToggleFavorite() {
+        viewModelScope.launch {
+            val newFavorite = !_uiState.value.favorite
+            libraryRepository.updateFavorite(mediaId, newFavorite)
+            _events.send(
+                DetailEvent.ShowMessage(
+                    if (newFavorite) "Added to favorites" else "Removed from favorites",
+                ),
+            )
+        }
+    }
+
+    fun onSetRating(rating: Int?) {
+        viewModelScope.launch {
+            libraryRepository.updateRating(mediaId, rating)
+            _events.send(
+                DetailEvent.ShowMessage(
+                    if (rating != null) "Rating set to $rating / 10" else "Rating removed",
+                ),
+            )
+        }
+    }
+
+    fun onSetNotes(notes: String?) {
+        viewModelScope.launch {
+            libraryRepository.updateNotes(mediaId, notes)
+            _events.send(DetailEvent.ShowMessage("Notes updated"))
+        }
+    }
+
+    fun onRewatch() {
+        viewModelScope.launch {
+            val detail = _uiState.value.detail ?: return@launch
+            logbookRepository.logWatched(mediaId = mediaId)
+            _events.send(DetailEvent.ShowMessage("Logged rewatch for ${detail.title}"))
+        }
+    }
+
     private fun observeDetail() {
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
@@ -169,6 +207,9 @@ class DetailViewModel @Inject constructor(
                             detail = media?.toDetail(currentProviders),
                             entryId = entry?.id,
                             status = entry?.status,
+                            favorite = entry?.favorite ?: false,
+                            personalRating = entry?.personalRating,
+                            notes = entry?.notes,
                             isLoading = media == null && state.isLoading,
                             errorMessage = if (media != null) null else state.errorMessage,
                         )
@@ -288,6 +329,9 @@ data class DetailUiState(
     val detail: MediaDetail? = null,
     val entryId: Long? = null,
     val status: MediaStatus? = null,
+    val favorite: Boolean = false,
+    val personalRating: Int? = null,
+    val notes: String? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val isOffline: Boolean = false,

@@ -38,8 +38,18 @@ titles and fetch details.
 - **Detail screen.** Backdrop, title, year · type, rating, overview, and
   **where to watch** — streaming, rental, and purchase providers grouped by
   category. Status controls let you add the title and move it between lists.
-  Works **offline**: if the network is unavailable but the title is already in
+  - **Favorite toggle** in the top bar to mark titles you love.
+  - **Personal rating** (1–10) with a tap-to-edit row.
+  - **Notes** with a tap-to-edit row.
+  - **Log rewatch** button for completed movies.
+  - Works **offline**: if the network is unavailable but the title is already in
   your lists, saved details are shown along with an offline banner.
+- **TV tracking.** Seasons and episodes for TV shows with per-episode watched
+  checkboxes, overall progress bar, and a **Next up** banner showing the next
+  unwatched episode.
+- **Logbook.** Append-only watch history for movies and shows. Filter by All /
+  Movies / TV. Each entry records when you watched something, with optional
+  rating and notes.
 - **Settings.** System/light/dark theme modes, dynamic-color control, streaming
   provider region, app version, and TMDB attribution.
 - **Theming.** Uses dynamic color on Android 12+ when enabled, with a warm
@@ -50,11 +60,12 @@ titles and fetch details.
 - **Language / UI:** Kotlin, Jetpack Compose (Material 3)
 - **Architecture:** MVVM with MVI-style UI state + one-shot effects
   (`StateFlow` + `Channel`)
+- **Navigation:** Bottom navigation with 4 tabs (Home, Search, Library, Logbook)
+  using Navigation Compose with type-safe `@Serializable` routes
 - **DI:** Hilt
 - **Local storage:** Room (offline-first catalog/library) + Preferences DataStore
 - **Networking:** Retrofit + OkHttp + `kotlinx.serialization`
 - **Images:** Coil 3
-- **Navigation:** Navigation Compose with type-safe `@Serializable` routes
 - **Minimum SDK:** 26 · Target/compile SDK: 37
 - Backed by the [TMDB API](https://www.themoviedb.org/documentation/api)
 
@@ -93,7 +104,7 @@ app/src/main/java/com/couchlist/app/
 │   ├── common/              # Shared error helpers
 │   ├── data/
 │   │   ├── di/              # Hilt modules (Room, Retrofit)
-│   │   ├── local/           # Room database, entity, DAO
+│   │   ├── local/           # Room database, entities, DAOs
 │   │   ├── remote/          # TMDB API, DTOs, API-key interceptor
 │   │   └── repository/      # Repository implementations
 │   ├── domain/
@@ -108,6 +119,7 @@ app/src/main/java/com/couchlist/app/
     ├── detail/              # Detail screen + ViewModel
     ├── home/                # Continue/recent dashboard
     ├── library/             # Lists, status tabs, and undoable swipes
+    ├── logbook/             # Watch history with filters
     ├── search/              # TMDB search
     └── settings/            # About + TMDB attribution
 ```

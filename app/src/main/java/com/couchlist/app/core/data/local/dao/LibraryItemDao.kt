@@ -90,4 +90,22 @@ interface LibraryItemDao {
 
     @Query("DELETE FROM library_items WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query(
+        "UPDATE library_items SET favorite = :favorite, updated_at = :updatedAt " +
+            "WHERE media_id = :mediaId",
+    )
+    suspend fun updateFavorite(mediaId: Long, favorite: Boolean, updatedAt: Long)
+
+    @Query(
+        "UPDATE library_items SET personal_rating = :rating, updated_at = :updatedAt " +
+            "WHERE media_id = :mediaId",
+    )
+    suspend fun updateRating(mediaId: Long, rating: Int?, updatedAt: Long)
+
+    @Query(
+        "UPDATE library_items SET notes = :notes, updated_at = :updatedAt " +
+            "WHERE media_id = :mediaId",
+    )
+    suspend fun updateNotes(mediaId: Long, notes: String?, updatedAt: Long)
 }
