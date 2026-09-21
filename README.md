@@ -33,11 +33,13 @@ titles and fetch details.
   - Both actions offer **Undo** from the snackbar.
   - **Tap a row** to open the full detail screen.
 - **Search.** Type-ahead TMDB search (movies *and* TV in one grid) with
-  debounced queries, poster cards, and a one-tap **Add to Watchlist** button.
-  Errors surface a friendly message with a retry button.
-- **Detail screen.** Backdrop, title, year · type, rating, overview, and
-  **where to watch** — streaming, rental, and purchase providers grouped by
-  category. Status controls let you add the title and move it between lists.
+  debounced queries, poster cards, ratings, and release year. Results already
+  in your library show an **In library** badge. Errors surface a friendly
+  message with a retry button.
+- **Detail screen.** Backdrop, title, year · type · runtime, genres, TMDB
+  rating, overview, and **where to watch** — streaming, rental, and purchase
+  providers grouped by category (via JustWatch). Status controls let you add
+  the title and move it between lists.
   - **Favorite toggle** in the top bar to mark titles you love.
   - **Personal rating** (1–10) with a tap-to-edit row.
   - **Notes** with a tap-to-edit row.

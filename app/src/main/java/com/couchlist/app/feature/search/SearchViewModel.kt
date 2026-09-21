@@ -38,7 +38,15 @@ class SearchViewModel @Inject constructor(
     private val _events = Channel<SearchEvent>(Channel.BUFFERED)
     val events: Flow<SearchEvent> = _events.receiveAsFlow()
 
+    private val libraryMediaIds = MutableStateFlow<Set<Long>>(emptySet())
+
     init {
+        viewModelScope.launch {
+            libraryRepository.observeAllMediaIds().collect { ids ->
+                libraryMediaIds.value = ids
+                refreshInLibraryStatus()
+            }
+        }
         viewModelScope.launch {
             _uiState
                 .map { it.query }
@@ -101,8 +109,15 @@ class SearchViewModel @Inject constructor(
         _uiState.update { it.copy(isSearching = true, errorMessage = null) }
         mediaRepository.searchMulti(query.trim())
             .onSuccess { results ->
+                val mediaIds = results.map { it.id }.toSet()
+                val foundInLibrary = libraryMediaIds.value.intersect(mediaIds)
                 _uiState.update {
-                    it.copy(results = results, isSearching = false, errorMessage = null)
+                    it.copy(
+                        results = results,
+                        inLibraryIds = foundInLibrary,
+                        isSearching = false,
+                        errorMessage = null,
+                    )
                 }
             }
             .onFailure { throwable ->
@@ -111,11 +126,21 @@ class SearchViewModel @Inject constructor(
                 }
             }
     }
+
+    private fun refreshInLibraryStatus() {
+        val currentIds = libraryMediaIds.value
+        _uiState.update { state ->
+            state.copy(
+                inLibraryIds = state.results.map { it.id }.toSet().intersect(currentIds),
+            )
+        }
+    }
 }
 
 data class SearchUiState(
     val query: String = "",
     val results: List<MediaSearchResult> = emptyList(),
+    val inLibraryIds: Set<Long> = emptySet(),
     val isSearching: Boolean = false,
     val errorMessage: String? = null,
 )

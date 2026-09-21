@@ -141,6 +141,9 @@ class LibraryRepositoryImpl @Inject constructor(
         libraryItemDao.updateNotes(mediaId, notes, System.currentTimeMillis())
     }
 
+    override fun observeAllMediaIds(): Flow<Set<Long>> =
+        libraryItemDao.observeAllMediaIds().map { it.toSet() }
+
     private suspend fun ensureList(
         name: String,
         type: MediaListType,

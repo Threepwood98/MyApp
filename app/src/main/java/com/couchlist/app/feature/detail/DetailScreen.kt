@@ -33,6 +33,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -241,6 +242,7 @@ private fun DetailContent(
             val subtitleParts = buildList {
                 detail.releaseYear?.let { add(it.toString()) }
                 add(detail.mediaType.name)
+                detail.runtimeMinutes?.let { add("${it}m") }
             }.joinToString(" · ")
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -248,6 +250,14 @@ private fun DetailContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (detail.genres.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = detail.genres.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (detail.voteAverage > 0.0) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -348,9 +358,16 @@ private fun DetailContent(
             }
             if (detail.providers.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Where to watch",
                     style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = "via JustWatch",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 detail.providers.groupBy { it.category }.forEach { (category, providers) ->
                     ProviderRow(label = category.displayName, providers = providers)

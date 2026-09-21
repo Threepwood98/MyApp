@@ -7,4 +7,5 @@ data class MediaSearchResult(
     val posterPath: String?,
     val releaseYear: Int?,
     val overview: String?,
+    val voteAverage: Double = 0.0,
 )

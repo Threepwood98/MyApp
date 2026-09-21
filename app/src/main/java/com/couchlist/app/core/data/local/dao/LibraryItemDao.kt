@@ -108,4 +108,7 @@ interface LibraryItemDao {
             "WHERE media_id = :mediaId",
     )
     suspend fun updateNotes(mediaId: Long, notes: String?, updatedAt: Long)
+
+    @Query("SELECT media_id FROM library_items")
+    fun observeAllMediaIds(): Flow<List<Long>>
 }

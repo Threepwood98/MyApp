@@ -5,19 +5,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -137,6 +142,7 @@ private fun SearchContent(
                 )
                 else -> SearchResultsGrid(
                     results = uiState.results,
+                    inLibraryIds = uiState.inLibraryIds,
                     onAddToWatchlist = onAddToWatchlist,
                     onResultClick = onResultClick,
                 )
@@ -225,6 +231,7 @@ private fun SearchErrorState(
 @Composable
 private fun SearchResultsGrid(
     results: List<MediaSearchResult>,
+    inLibraryIds: Set<Long>,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
@@ -238,6 +245,7 @@ private fun SearchResultsGrid(
         items(items = results, key = { "${it.mediaType}-${it.id}" }) { result ->
             MediaResultCard(
                 result = result,
+                isInLibrary = result.id in inLibraryIds,
                 onAddToWatchlist = onAddToWatchlist,
                 onResultClick = onResultClick,
             )
@@ -248,6 +256,7 @@ private fun SearchResultsGrid(
 @Composable
 private fun MediaResultCard(
     result: MediaSearchResult,
+    isInLibrary: Boolean,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
@@ -274,16 +283,44 @@ private fun MediaResultCard(
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
-            IconButton(
-                onClick = { onAddToWatchlist(result) },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(4.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add ${result.title} to Watchlist",
-                )
+            if (isInLibrary) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.extraSmall,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "In library",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
+            } else {
+                IconButton(
+                    onClick = { onAddToWatchlist(result) },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add ${result.title} to Watchlist",
+                    )
+                }
             }
         }
         Text(
@@ -293,6 +330,28 @@ private fun MediaResultCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
+        val subtitle = listOfNotNull(
+            result.releaseYear?.toString(),
+            if (result.voteAverage > 0.0) "${result.voteAverage}" else null,
+        ).joinToString(" · ")
+        if (subtitle.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (result.voteAverage > 0.0) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

@@ -21,4 +21,5 @@ data class MediaResultDto(
     @SerialName("release_date") val releaseDate: String? = null,
     @SerialName("first_air_date") val firstAirDate: String? = null,
     val overview: String? = null,
+    @SerialName("vote_average") val voteAverage: Double = 0.0,
 )

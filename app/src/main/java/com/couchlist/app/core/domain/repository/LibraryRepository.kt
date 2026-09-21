@@ -33,4 +33,6 @@ interface LibraryRepository {
     suspend fun updateRating(mediaId: Long, rating: Int?)
 
     suspend fun updateNotes(mediaId: Long, notes: String?)
+
+    fun observeAllMediaIds(): Flow<Set<Long>>
 }

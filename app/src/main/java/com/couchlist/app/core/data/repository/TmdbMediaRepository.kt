@@ -85,6 +85,7 @@ class TmdbMediaRepository @Inject constructor(
             posterPath = posterPath,
             releaseYear = (releaseDate ?: firstAirDate).toYear(),
             overview = overview,
+            voteAverage = voteAverage,
         )
     }
 
