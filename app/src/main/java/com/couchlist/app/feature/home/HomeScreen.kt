@@ -46,10 +46,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
+import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaItem
+import com.couchlist.app.core.domain.model.MediaMetadata
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
-import com.couchlist.app.core.domain.model.MediaType
-import com.couchlist.app.core.ui.components.TmdbImages
 import com.couchlist.app.core.ui.theme.CouchlistTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -213,9 +214,9 @@ private fun DashboardCard(
             .width(136.dp)
             .clickable(onClick = onClick),
     ) {
-        if (item.media.posterPath != null) {
+        if (item.media.artworkUri != null) {
             AsyncImage(
-                model = TmdbImages.posterUrl(item.media.posterPath, "w342"),
+                model = item.media.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -278,19 +279,18 @@ private fun HomePreview() {
 private val sampleLibraryMedia = LibraryMedia(
     media = MediaItem(
         id = 1,
-        mediaType = MediaType.MOVIE,
-        tmdbId = 550,
+        reference = MediaReference("tmdb", MediaCategory.MOVIE, "550"),
         title = "Fight Club",
         originalTitle = "Fight Club",
-        overview = null,
-        posterPath = null,
-        backdropPath = null,
+        description = null,
+        artworkUri = null,
+        backdropUri = null,
         releaseDate = "1999-10-15",
         originalLanguage = "en",
-        runtimeMinutes = 139,
         externalRating = 8.4,
         externalVoteCount = 0,
         genres = listOf("Drama"),
+        metadata = MediaMetadata.Video(runtimeMinutes = 139),
         lastRefreshedAt = null,
         createdAt = 1,
         updatedAt = 1,

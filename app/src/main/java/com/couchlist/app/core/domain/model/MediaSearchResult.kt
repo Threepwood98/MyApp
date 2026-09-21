@@ -1,11 +1,13 @@
 package com.couchlist.app.core.domain.model
 
 data class MediaSearchResult(
-    val id: Long,
-    val mediaType: MediaType,
+    val reference: MediaReference,
     val title: String,
-    val posterPath: String?,
+    val artworkUri: String?,
     val releaseYear: Int?,
-    val overview: String?,
+    val description: String?,
     val voteAverage: Double = 0.0,
-)
+) {
+    val category: MediaCategory
+        get() = reference.category
+}

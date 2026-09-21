@@ -3,9 +3,6 @@ package com.couchlist.app.core.data.di
 import com.couchlist.app.BuildConfig
 import com.couchlist.app.core.data.remote.ApiKeyInterceptor
 import com.couchlist.app.core.data.remote.TmdbApi
-import com.couchlist.app.core.data.repository.TmdbMediaRepository
-import com.couchlist.app.core.domain.repository.MediaRepository
-import com.couchlist.app.core.domain.repository.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,6 +29,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @TmdbNetwork
     fun provideOkHttpClient(): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .addInterceptor(ApiKeyInterceptor())
@@ -50,7 +48,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit =
+    @TmdbNetwork
+    fun provideRetrofit(@TmdbNetwork okHttpClient: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()
             .baseUrl("https://api.themoviedb.org/3/")
             .client(okHttpClient)
@@ -61,12 +60,6 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideTmdbApi(retrofit: Retrofit): TmdbApi = retrofit.create(TmdbApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideMediaRepository(
-        api: TmdbApi,
-        settingsRepository: SettingsRepository,
-    ): MediaRepository = TmdbMediaRepository(api, settingsRepository)
+    fun provideTmdbApi(@TmdbNetwork retrofit: Retrofit): TmdbApi =
+        retrofit.create(TmdbApi::class.java)
 }

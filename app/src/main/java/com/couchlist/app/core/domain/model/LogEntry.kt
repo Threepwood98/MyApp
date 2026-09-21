@@ -34,6 +34,6 @@ data class LogEntry(
 data class LogMediaEntry(
     val entry: LogEntry,
     val mediaTitle: String,
-    val posterPath: String?,
-    val mediaType: MediaType,
+    val artworkUri: String?,
+    val category: MediaCategory,
 )

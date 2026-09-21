@@ -4,37 +4,38 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.couchlist.app.core.domain.model.MediaType
+import com.couchlist.app.core.domain.model.MediaCategory
 
 /**
- * Catalog/metadata cache for a movie or TV show. Purely external data sourced
- * from TMDB, with no user state (see [LibraryItemEntity]).
+ * Catalog/metadata cache for a movie or TV show. Provider-neutral; external
+ * data is sourced via [com.couchlist.app.core.data.remote.provider.MediaMetadataProvider].
+ * User state lives in [LibraryItemEntity].
  */
 @Entity(
     tableName = "media_items",
-    indices = [Index(value = ["media_type", "tmdb_id"], unique = true)],
+    indices = [Index(value = ["source", "category", "external_id"], unique = true)],
 )
 data class MediaItemEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
-    @ColumnInfo(name = "media_type")
-    val mediaType: MediaType,
-    @ColumnInfo(name = "tmdb_id")
-    val tmdbId: Long,
+    @ColumnInfo(name = "source")
+    val source: String,
+    @ColumnInfo(name = "category")
+    val category: MediaCategory,
+    @ColumnInfo(name = "external_id")
+    val externalId: String,
     val title: String,
     @ColumnInfo(name = "original_title")
     val originalTitle: String?,
-    val overview: String?,
-    @ColumnInfo(name = "poster_path")
-    val posterPath: String?,
-    @ColumnInfo(name = "backdrop_path")
-    val backdropPath: String?,
+    val description: String?,
+    @ColumnInfo(name = "artwork_uri")
+    val artworkUri: String?,
+    @ColumnInfo(name = "backdrop_uri")
+    val backdropUri: String?,
     @ColumnInfo(name = "release_date")
     val releaseDate: String?,
     @ColumnInfo(name = "original_language")
     val originalLanguage: String?,
-    @ColumnInfo(name = "runtime_minutes")
-    val runtimeMinutes: Int?,
     @ColumnInfo(name = "external_rating")
     val externalRating: Double = 0.0,
     @ColumnInfo(name = "external_vote_count")

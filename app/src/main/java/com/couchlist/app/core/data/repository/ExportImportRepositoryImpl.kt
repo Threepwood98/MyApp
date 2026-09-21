@@ -1,5 +1,6 @@
 package com.couchlist.app.core.data.repository
 
+import androidx.room.withTransaction
 import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.LogEntryDao
@@ -16,10 +17,11 @@ import com.couchlist.app.core.data.local.entity.LogEntryEntity
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.local.entity.MediaListEntity
 import com.couchlist.app.core.data.local.entity.MediaListJoinEntity
+import com.couchlist.app.core.data.local.entity.VideoMetadataEntity
 import com.couchlist.app.core.domain.model.LogAction
+import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
-import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.repository.ExportImportRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,7 +39,10 @@ class ExportImportRepositoryImpl @Inject constructor(
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     override suspend fun exportToJson(): String {
-        val mediaItems = mediaItemDao.getAll().map { it.toExport() }
+        val mediaItems = mediaItemDao.getAll().map { entity ->
+            val runtime = mediaItemDao.getRuntimeMinutes(entity.id)
+            entity.toExport(runtime)
+        }
         val libraryItems = libraryItemDao.getAll().map { entity ->
             val media = mediaItemDao.getById(entity.mediaId)
             entity.toExport(media)
@@ -48,10 +53,11 @@ class ExportImportRepositoryImpl @Inject constructor(
             val list = mediaListDao.getListById(join.listId) ?: return@mapNotNull null
             val media = mediaItemDao.getById(join.mediaId) ?: return@mapNotNull null
             ExportListMembership(
+                source = media.source,
+                category = media.category.name,
+                externalId = media.externalId,
                 listName = list.name,
                 listType = list.type.name,
-                mediaType = media.mediaType.name,
-                tmdbId = media.tmdbId,
             )
         }
         val logEntries = logEntryDao.getAll().mapNotNull { entity ->
@@ -71,77 +77,135 @@ class ExportImportRepositoryImpl @Inject constructor(
 
     override suspend fun importFromJson(jsonString: String) {
         val data = json.decodeFromString(LibraryExportData.serializer(), jsonString)
+        validateImportData(data)
 
-        // Clear existing data in dependency order
-        logEntryDao.deleteAll()
-        mediaListDao.deleteAllJoins()
-        mediaListDao.deleteAllLists()
-        libraryItemDao.deleteAll()
-        mediaItemDao.deleteAll()
+        database.withTransaction {
+            logEntryDao.deleteAll()
+            mediaListDao.deleteAllJoins()
+            mediaListDao.deleteAllLists()
+            libraryItemDao.deleteAll()
+            mediaItemDao.deleteAll()
 
-        // Import media items and build TMDB ID -> local ID map
-        val mediaIdMap = mutableMapOf<Pair<String, Long>, Long>()
-        val entities = data.mediaItems.map { it.toEntity() }
-        mediaItemDao.insertAll(entities)
-        data.mediaItems.forEach { export ->
-            val mediaType = MediaType.valueOf(export.mediaType)
-            val entity = mediaItemDao.getByTmdb(mediaType, export.tmdbId)
-            if (entity != null) {
-                mediaIdMap[export.mediaType to export.tmdbId] = entity.id
+            val mediaIdMap = mutableMapOf<String, Long>()
+            val entities = data.mediaItems.map { it.toEntity() }
+            mediaItemDao.insertAll(entities)
+            data.mediaItems.forEach { export ->
+                val source = export.resolvedSource()
+                val category = MediaCategory.valueOf(export.resolvedCategory())
+                val externalId = export.resolvedExternalId()
+                val entity = mediaItemDao.getByReference(source, category, externalId)
+                if (entity != null) {
+                    mediaIdMap[referenceKey(source, category, externalId)] = entity.id
+                }
             }
-        }
 
-        // Import lists and build list name+type -> local ID map
-        val listIdMap = mutableMapOf<Pair<String, String>, Long>()
-        val listEntities = data.lists.map { it.toEntity() }
-        mediaListDao.insertAllLists(listEntities)
-        data.lists.forEach { export ->
-            val type = MediaListType.valueOf(export.type)
-            val id = mediaListDao.findListId(export.name, type)
-            if (id != null) {
-                listIdMap[export.name to export.type] = id
+            // Import video metadata (runtime) so round-trips preserve runtime_minutes.
+            data.mediaItems.filter { it.runtimeMinutes != null }.forEach { export ->
+                val source = export.resolvedSource()
+                val category = MediaCategory.valueOf(export.resolvedCategory())
+                val externalId = export.resolvedExternalId()
+                val localMediaId = mediaIdMap[referenceKey(source, category, externalId)]
+                    ?: return@forEach
+                mediaItemDao.upsertVideoMetadata(
+                    VideoMetadataEntity(mediaId = localMediaId, runtimeMinutes = export.runtimeMinutes),
+                )
             }
-        }
 
-        // Import library items
-        val libraryEntities = data.libraryItems.mapNotNull { export ->
-            val localMediaId = mediaIdMap[export.mediaType to export.tmdbId]
-                ?: return@mapNotNull null
-            export.toEntity(localMediaId)
-        }
-        libraryItemDao.insertAll(libraryEntities)
+            // Import lists and build list name+type -> local ID map.
+            val listIdMap = mutableMapOf<Pair<String, String>, Long>()
+            val listEntities = data.lists.map { it.toEntity() }
+            mediaListDao.insertAllLists(listEntities)
+            data.lists.forEach { export ->
+                val type = MediaListType.valueOf(export.type)
+                val id = mediaListDao.findListId(export.name, type)
+                if (id != null) {
+                    listIdMap[export.name to export.type] = id
+                }
+            }
 
-        // Import list memberships
-        val joins = data.listMemberships.mapNotNull { export ->
-            val localListId = listIdMap[export.listName to export.listType]
-                ?: return@mapNotNull null
-            val localMediaId = mediaIdMap[export.mediaType to export.tmdbId]
-                ?: return@mapNotNull null
-            MediaListJoinEntity(
-                listId = localListId,
-                mediaId = localMediaId,
-                addedAt = System.currentTimeMillis(),
-            )
-        }
-        mediaListDao.insertAllJoins(joins)
+            // Import library items.
+            val libraryEntities = data.libraryItems.mapNotNull { export ->
+                val source = export.resolvedSource()
+                val category = MediaCategory.valueOf(export.resolvedCategory())
+                val externalId = export.resolvedExternalId()
+                val localMediaId = mediaIdMap[referenceKey(source, category, externalId)]
+                    ?: return@mapNotNull null
+                export.toEntity(localMediaId)
+            }
+            libraryItemDao.insertAll(libraryEntities)
 
-        // Import log entries
-        val logEntities = data.logEntries.mapNotNull { export ->
-            val localMediaId = mediaIdMap[export.mediaType to export.tmdbId]
-                ?: return@mapNotNull null
-            export.toEntity(localMediaId)
+            // Import list memberships.
+            val joins = data.listMemberships.mapNotNull { export ->
+                val localListId = listIdMap[export.listName to export.listType]
+                    ?: return@mapNotNull null
+                val source = export.resolvedSource()
+                val category = MediaCategory.valueOf(export.resolvedCategory())
+                val externalId = export.resolvedExternalId()
+                val localMediaId = mediaIdMap[referenceKey(source, category, externalId)]
+                    ?: return@mapNotNull null
+                MediaListJoinEntity(
+                    listId = localListId,
+                    mediaId = localMediaId,
+                    addedAt = System.currentTimeMillis(),
+                )
+            }
+            mediaListDao.insertAllJoins(joins)
+
+            // Import log entries.
+            val logEntities = data.logEntries.mapNotNull { export ->
+                val source = export.resolvedSource()
+                val category = MediaCategory.valueOf(export.resolvedCategory())
+                val externalId = export.resolvedExternalId()
+                val localMediaId = mediaIdMap[referenceKey(source, category, externalId)]
+                    ?: return@mapNotNull null
+                export.toEntity(localMediaId)
+            }
+            logEntryDao.insertAll(logEntities)
         }
-        logEntryDao.insertAll(logEntities)
     }
 
-    private fun MediaItemEntity.toExport() = ExportMediaItem(
-        mediaType = mediaType.name,
-        tmdbId = tmdbId,
+    private fun validateImportData(data: LibraryExportData) {
+        data.mediaItems.forEach { item ->
+            item.resolvedSource()
+            MediaCategory.valueOf(item.resolvedCategory())
+            item.resolvedExternalId()
+        }
+        data.libraryItems.forEach { item ->
+            item.resolvedSource()
+            MediaCategory.valueOf(item.resolvedCategory())
+            item.resolvedExternalId()
+            MediaStatus.valueOf(item.status)
+        }
+        data.lists.forEach { MediaListType.valueOf(it.type) }
+        data.logEntries.forEach { entry ->
+            entry.resolvedSource()
+            MediaCategory.valueOf(entry.resolvedCategory())
+            entry.resolvedExternalId()
+            LogAction.valueOf(entry.action)
+        }
+    }
+
+    private fun normalizeArtworkUri(uri: String?): String? = when {
+        uri == null -> null
+        uri.startsWith("http://") || uri.startsWith("https://") -> uri
+        else -> "https://image.tmdb.org/t/p/w500$uri"
+    }
+
+    private fun normalizeBackdropUri(uri: String?): String? = when {
+        uri == null -> null
+        uri.startsWith("http://") || uri.startsWith("https://") -> uri
+        else -> "https://image.tmdb.org/t/p/w780$uri"
+    }
+
+    private fun MediaItemEntity.toExport(runtimeMinutes: Int? = null) = ExportMediaItem(
+        source = source,
+        category = category.name,
+        externalId = externalId,
         title = title,
         originalTitle = originalTitle,
-        overview = overview,
-        posterPath = posterPath,
-        backdropPath = backdropPath,
+        description = description,
+        artworkUri = artworkUri,
+        backdropUri = backdropUri,
         releaseDate = releaseDate,
         originalLanguage = originalLanguage,
         runtimeMinutes = runtimeMinutes,
@@ -153,16 +217,16 @@ class ExportImportRepositoryImpl @Inject constructor(
     )
 
     private fun ExportMediaItem.toEntity() = MediaItemEntity(
-        mediaType = MediaType.valueOf(mediaType),
-        tmdbId = tmdbId,
+        source = resolvedSource(),
+        category = MediaCategory.valueOf(resolvedCategory()),
+        externalId = resolvedExternalId(),
         title = title,
         originalTitle = originalTitle,
-        overview = overview,
-        posterPath = posterPath,
-        backdropPath = backdropPath,
+        description = description ?: overview,
+        artworkUri = normalizeArtworkUri(artworkUri ?: posterPath),
+        backdropUri = normalizeBackdropUri(backdropUri ?: backdropPath),
         releaseDate = releaseDate,
         originalLanguage = originalLanguage,
-        runtimeMinutes = runtimeMinutes,
         externalRating = externalRating,
         externalVoteCount = externalVoteCount,
         genres = genres,
@@ -172,8 +236,9 @@ class ExportImportRepositoryImpl @Inject constructor(
     )
 
     private fun LibraryItemEntity.toExport(media: MediaItemEntity?) = ExportLibraryItem(
-        mediaType = media?.mediaType?.name ?: "MOVIE",
-        tmdbId = media?.tmdbId ?: 0L,
+        source = media?.source,
+        category = media?.category?.name,
+        externalId = media?.externalId,
         status = status.name,
         progress = progress,
         personalRating = personalRating,
@@ -220,8 +285,9 @@ class ExportImportRepositoryImpl @Inject constructor(
     )
 
     private fun LogEntryEntity.toExport(media: MediaItemEntity) = ExportLogEntry(
-        mediaType = media.mediaType.name,
-        tmdbId = media.tmdbId,
+        source = media.source,
+        category = media.category.name,
+        externalId = media.externalId,
         action = action.name,
         date = date,
         personalRating = personalRating,
@@ -240,4 +306,7 @@ class ExportImportRepositoryImpl @Inject constructor(
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
+
+    private fun referenceKey(source: String, category: MediaCategory, externalId: String): String =
+        "$source:${category.name}:$externalId"
 }

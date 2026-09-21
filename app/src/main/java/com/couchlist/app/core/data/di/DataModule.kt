@@ -7,12 +7,14 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.MIGRATION_1_3
+import com.couchlist.app.core.data.local.MIGRATION_3_4
 import com.couchlist.app.core.data.local.SEED_DEFAULT_LISTS_CALLBACK
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.LogEntryDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
+import com.couchlist.app.core.data.remote.provider.MetadataProviderRegistry
 import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
 import com.couchlist.app.core.data.repository.ExportImportRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
@@ -24,7 +26,6 @@ import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.ExportImportRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.LogbookRepository
-import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.SettingsRepository
 import com.couchlist.app.core.domain.repository.StatisticsRepository
 import com.couchlist.app.core.domain.repository.TvRepository
@@ -59,7 +60,7 @@ object DataModule {
             CouchlistDatabase::class.java,
             "couchlist.db",
         )
-            .addMigrations(MIGRATION_1_3)
+            .addMigrations(MIGRATION_1_3, MIGRATION_3_4)
             .addCallback(SEED_DEFAULT_LISTS_CALLBACK)
             .build()
 
@@ -98,8 +99,8 @@ object DataModule {
         database: CouchlistDatabase,
         mediaItemDao: MediaItemDao,
         tvDao: TvDao,
-        mediaRepository: MediaRepository,
-    ): CatalogRepository = CatalogRepositoryImpl(database, mediaItemDao, tvDao, mediaRepository)
+        providerRegistry: MetadataProviderRegistry,
+    ): CatalogRepository = CatalogRepositoryImpl(database, mediaItemDao, tvDao, providerRegistry)
 
     @Provides
     @Singleton
@@ -108,13 +109,13 @@ object DataModule {
         mediaItemDao: MediaItemDao,
         libraryItemDao: LibraryItemDao,
         tvDao: TvDao,
-        mediaRepository: MediaRepository,
+        providerRegistry: MetadataProviderRegistry,
     ): TvRepository = TvRepositoryImpl(
         database,
         mediaItemDao,
         libraryItemDao,
         tvDao,
-        mediaRepository,
+        providerRegistry,
     )
 
     @Provides

@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 
 /**
  * Cached TV episode metadata. Episode watch state is tracked via
- * the logbook in a later phase, not on this row.
+ * the logbook, not on this row.
  */
 @Entity(
     tableName = "episodes",
@@ -45,8 +45,8 @@ data class EpisodeEntity(
     val episodeNumber: Int,
     val title: String,
     val overview: String?,
-    @ColumnInfo(name = "still_path")
-    val stillPath: String?,
+    @ColumnInfo(name = "artwork_uri")
+    val artworkUri: String?,
     @ColumnInfo(name = "air_date")
     val airDate: String?,
     @ColumnInfo(name = "runtime_minutes")

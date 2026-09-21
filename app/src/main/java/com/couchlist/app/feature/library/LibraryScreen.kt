@@ -89,7 +89,6 @@ import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.SmartFilter
 import com.couchlist.app.core.domain.model.nextStatus
-import com.couchlist.app.core.ui.components.TmdbImages
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -640,9 +639,9 @@ private fun LibraryMediaRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (item.media.posterPath != null) {
+        if (item.media.artworkUri != null) {
             AsyncImage(
-                model = TmdbImages.posterUrl(item.media.posterPath, "w154"),
+                model = item.media.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -672,7 +671,7 @@ private fun LibraryMediaRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${item.media.mediaType.name} \u00B7 Added ${DateUtils.getRelativeTimeSpanString(item.library.addedAt)}",
+                text = "${item.media.category.name} \u00B7 Added ${DateUtils.getRelativeTimeSpanString(item.library.addedAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -705,9 +704,9 @@ private fun SelectableLibraryRow(
             onCheckedChange = { onToggleSelection() },
         )
         Spacer(modifier = Modifier.width(12.dp))
-        if (item.media.posterPath != null) {
+        if (item.media.artworkUri != null) {
             AsyncImage(
-                model = TmdbImages.posterUrl(item.media.posterPath, "w154"),
+                model = item.media.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -737,7 +736,7 @@ private fun SelectableLibraryRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${item.media.mediaType.name} \u00B7 ${item.library.status.displayName}",
+                text = "${item.media.category.name} \u00B7 ${item.library.status.displayName}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

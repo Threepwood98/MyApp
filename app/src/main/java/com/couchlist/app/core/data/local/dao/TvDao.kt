@@ -21,12 +21,12 @@ interface TvDao {
 
     @Query(
         "SELECT episodes.*, " +
-            "CASE WHEN (" +
+            "CASE WHEN COALESCE((" +
             "SELECT action FROM log_entries " +
             "WHERE episode_id = episodes.id " +
             "AND action IN ('EPISODE_WATCHED', 'EPISODE_UNWATCHED') " +
             "ORDER BY id DESC LIMIT 1" +
-            ") = 'EPISODE_WATCHED' THEN 1 ELSE 0 END AS is_watched " +
+            "), 'EPISODE_UNWATCHED') = 'EPISODE_WATCHED' THEN 1 ELSE 0 END AS is_watched " +
             "FROM episodes " +
             "WHERE media_id = :mediaId AND season_number = :seasonNumber " +
             "ORDER BY episode_number",
@@ -40,10 +40,10 @@ interface TvDao {
         "SELECT " +
             "(SELECT COUNT(*) FROM episodes AS episode " +
             "WHERE episode.media_id = :mediaId AND episode.season_number > 0 " +
-            "AND (SELECT action FROM log_entries " +
+            "AND COALESCE((SELECT action FROM log_entries " +
             "WHERE episode_id = episode.id " +
             "AND action IN ('EPISODE_WATCHED', 'EPISODE_UNWATCHED') " +
-            "ORDER BY id DESC LIMIT 1) = 'EPISODE_WATCHED') AS watched_episodes, " +
+            "ORDER BY id DESC LIMIT 1), 'EPISODE_UNWATCHED') = 'EPISODE_WATCHED') AS watched_episodes, " +
             "COALESCE((SELECT SUM(episode_count) FROM seasons " +
             "WHERE media_id = :mediaId AND season_number > 0), 0) AS total_episodes " +
             "FROM media_items WHERE id = :mediaId",
@@ -54,7 +54,7 @@ interface TvDao {
     suspend fun insertSeasonIgnore(season: SeasonEntity): Long
 
     @Query(
-        "UPDATE seasons SET name = :name, overview = :overview, poster_path = :posterPath, " +
+        "UPDATE seasons SET name = :name, overview = :overview, artwork_uri = :artworkUri, " +
             "air_date = :airDate, episode_count = :episodeCount, " +
             "last_refreshed_at = :lastRefreshedAt " +
             "WHERE media_id = :mediaId AND season_number = :seasonNumber",
@@ -64,7 +64,7 @@ interface TvDao {
         seasonNumber: Int,
         name: String,
         overview: String?,
-        posterPath: String?,
+        artworkUri: String?,
         airDate: String?,
         episodeCount: Int,
         lastRefreshedAt: Long?,
@@ -82,7 +82,7 @@ interface TvDao {
             seasonNumber = season.seasonNumber,
             name = season.name,
             overview = season.overview,
-            posterPath = season.posterPath,
+            artworkUri = season.artworkUri,
             airDate = season.airDate,
             episodeCount = season.episodeCount,
             lastRefreshedAt = season.lastRefreshedAt,
@@ -94,7 +94,7 @@ interface TvDao {
     suspend fun insertEpisodeIgnore(episode: EpisodeEntity): Long
 
     @Query(
-        "UPDATE episodes SET title = :title, overview = :overview, still_path = :stillPath, " +
+        "UPDATE episodes SET title = :title, overview = :overview, artwork_uri = :artworkUri, " +
             "air_date = :airDate, runtime_minutes = :runtimeMinutes " +
             "WHERE season_id = :seasonId AND episode_number = :episodeNumber",
     )
@@ -103,7 +103,7 @@ interface TvDao {
         episodeNumber: Int,
         title: String,
         overview: String?,
-        stillPath: String?,
+        artworkUri: String?,
         airDate: String?,
         runtimeMinutes: Int?,
     )
@@ -116,7 +116,7 @@ interface TvDao {
             episodeNumber = episode.episodeNumber,
             title = episode.title,
             overview = episode.overview,
-            stillPath = episode.stillPath,
+            artworkUri = episode.artworkUri,
             airDate = episode.airDate,
             runtimeMinutes = episode.runtimeMinutes,
         )
@@ -138,10 +138,10 @@ interface TvDao {
     @Query(
         "SELECT COUNT(*) FROM episodes AS episode " +
             "WHERE episode.media_id = :mediaId AND episode.season_number > 0 " +
-            "AND (SELECT action FROM log_entries " +
+            "AND COALESCE((SELECT action FROM log_entries " +
             "WHERE episode_id = episode.id " +
             "AND action IN ('EPISODE_WATCHED', 'EPISODE_UNWATCHED') " +
-            "ORDER BY id DESC LIMIT 1) = 'EPISODE_WATCHED'",
+            "ORDER BY id DESC LIMIT 1), 'EPISODE_UNWATCHED') = 'EPISODE_WATCHED'",
     )
     suspend fun getWatchedEpisodeCount(mediaId: Long): Int
 
@@ -161,12 +161,12 @@ interface TvDao {
             ") = 'EPISODE_WATCHED' THEN 1 ELSE 0 END AS is_watched " +
             "FROM episodes " +
             "WHERE episodes.media_id = :mediaId AND episodes.season_number > 0 " +
-            "AND (" +
+            "AND COALESCE((" +
             "SELECT action FROM log_entries " +
             "WHERE episode_id = episodes.id " +
             "AND action IN ('EPISODE_WATCHED', 'EPISODE_UNWATCHED') " +
             "ORDER BY id DESC LIMIT 1" +
-            ") != 'EPISODE_WATCHED' " +
+            "), 'EPISODE_UNWATCHED') != 'EPISODE_WATCHED' " +
             "ORDER BY episodes.season_number, episodes.episode_number " +
             "LIMIT 1",
     )

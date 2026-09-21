@@ -1,25 +1,27 @@
 package com.couchlist.app.core.domain.model
 
-/**
- * Pure catalog/metadata for a movie or TV show, sourced from TMDB and cached locally.
- * Contains no user-specific data; see [LibraryItem].
- */
+/** Common provider-neutral metadata with category-specific data kept in [metadata]. */
 data class MediaItem(
     val id: Long,
-    val mediaType: MediaType,
-    val tmdbId: Long,
+    val reference: MediaReference,
     val title: String,
     val originalTitle: String?,
-    val overview: String?,
-    val posterPath: String?,
-    val backdropPath: String?,
+    val description: String?,
+    val artworkUri: String?,
+    val backdropUri: String?,
     val releaseDate: String?,
     val originalLanguage: String?,
-    val runtimeMinutes: Int?,
     val externalRating: Double,
     val externalVoteCount: Long,
     val genres: List<String>,
+    val metadata: MediaMetadata,
     val lastRefreshedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
-)
+) {
+    val category: MediaCategory
+        get() = reference.category
+
+    val runtimeMinutes: Int?
+        get() = (metadata as? MediaMetadata.Video)?.runtimeMinutes
+}

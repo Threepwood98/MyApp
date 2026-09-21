@@ -351,20 +351,19 @@ internal fun List<TvSeason>.defaultSeasonNumber(): Int? =
         ?: firstOrNull()?.seasonNumber
 
 private fun MediaItem.toDetail(providers: List<WatchProvider>) = MediaDetail(
-    id = tmdbId,
-    mediaType = mediaType,
+    reference = reference,
     title = title,
     originalTitle = originalTitle,
-    overview = overview,
+    description = description,
     releaseDate = releaseDate,
     originalLanguage = originalLanguage,
-    runtimeMinutes = runtimeMinutes,
-    posterPath = posterPath,
-    backdropPath = backdropPath,
+    artworkUri = artworkUri,
+    backdropUri = backdropUri,
     voteAverage = externalRating,
     voteCount = externalVoteCount,
     genres = genres,
     providers = providers,
+    metadata = metadata,
 )
 
 sealed interface DetailEvent {

@@ -14,11 +14,13 @@ import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.local.entity.MediaListEntity
 import com.couchlist.app.core.data.local.entity.MediaListJoinEntity
 import com.couchlist.app.core.data.local.entity.SeasonEntity
+import com.couchlist.app.core.data.local.entity.VideoMetadataEntity
 import com.couchlist.app.core.data.local.entity.WatchProviderCacheEntity
 
 @Database(
     entities = [
         MediaItemEntity::class,
+        VideoMetadataEntity::class,
         LibraryItemEntity::class,
         MediaListEntity::class,
         MediaListJoinEntity::class,
@@ -27,7 +29,7 @@ import com.couchlist.app.core.data.local.entity.WatchProviderCacheEntity
         LogEntryEntity::class,
         WatchProviderCacheEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class CouchlistDatabase : RoomDatabase() {

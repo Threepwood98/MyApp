@@ -5,7 +5,7 @@ import com.couchlist.app.core.data.local.entity.LogEntryEntity
 import com.couchlist.app.core.domain.model.LogAction
 import com.couchlist.app.core.domain.model.LogEntry
 import com.couchlist.app.core.domain.model.LogMediaEntry
-import com.couchlist.app.core.domain.model.MediaType
+import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.repository.LogbookRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -56,7 +56,7 @@ class LogbookRepositoryImpl @Inject constructor(
                 updatedAt = logEntry.updatedAt,
             ),
             mediaTitle = mediaTitle,
-            posterPath = posterPath,
-            mediaType = MediaType.valueOf(mediaType),
+            artworkUri = artworkUri,
+            category = MediaCategory.valueOf(category),
         )
 }

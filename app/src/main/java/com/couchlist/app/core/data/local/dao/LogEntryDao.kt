@@ -16,8 +16,8 @@ interface LogEntryDao {
     @Query(
         "SELECT log_entries.*, " +
             "media_items.title AS m_title, " +
-            "media_items.poster_path AS m_poster_path, " +
-            "media_items.media_type AS m_media_type " +
+            "media_items.artwork_uri AS m_artwork_uri, " +
+            "media_items.category AS m_category " +
             "FROM log_entries " +
             "INNER JOIN media_items ON log_entries.media_id = media_items.id " +
             "ORDER BY log_entries.date DESC",
@@ -27,8 +27,8 @@ interface LogEntryDao {
     @Query(
         "SELECT log_entries.*, " +
             "media_items.title AS m_title, " +
-            "media_items.poster_path AS m_poster_path, " +
-            "media_items.media_type AS m_media_type " +
+            "media_items.artwork_uri AS m_artwork_uri, " +
+            "media_items.category AS m_category " +
             "FROM log_entries " +
             "INNER JOIN media_items ON log_entries.media_id = media_items.id " +
             "WHERE log_entries.action = :action " +

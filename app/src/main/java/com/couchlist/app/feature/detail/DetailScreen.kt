@@ -68,14 +68,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaDetail
+import com.couchlist.app.core.domain.model.MediaMetadata
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
-import com.couchlist.app.core.domain.model.MediaType
 import com.couchlist.app.core.domain.model.ProviderCategory
 import com.couchlist.app.core.domain.model.TvEpisode
 import com.couchlist.app.core.domain.model.TvSeason
 import com.couchlist.app.core.domain.model.WatchProvider
-import com.couchlist.app.core.ui.components.TmdbImages
 import com.couchlist.app.core.ui.theme.CouchlistTheme
 import coil3.compose.AsyncImage
 
@@ -226,8 +227,7 @@ private fun DetailContent(
             OfflineBanner()
         }
         AsyncImage(
-            model = TmdbImages.backdropUrl(detail.backdropPath)
-                ?: TmdbImages.posterUrl(detail.posterPath),
+            model = detail.backdropUri ?: detail.artworkUri,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -241,7 +241,7 @@ private fun DetailContent(
             )
             val subtitleParts = buildList {
                 detail.releaseYear?.let { add(it.toString()) }
-                add(detail.mediaType.name)
+                add(detail.category.name)
                 detail.runtimeMinutes?.let { add("${it}m") }
             }.joinToString(" · ")
             Spacer(modifier = Modifier.height(4.dp))
@@ -287,14 +287,14 @@ private fun DetailContent(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
-            if (!detail.overview.isNullOrBlank()) {
+            if (!detail.description.isNullOrBlank()) {
                 Text(
                     text = "Overview",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = detail.overview,
+                    text = detail.description,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -325,7 +325,7 @@ private fun DetailContent(
                     Text(text = "Remove from lists")
                 }
             }
-            if (detail.mediaType == MediaType.MOVIE) {
+            if (detail.category == MediaCategory.MOVIE) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = onMarkAsWatchedClick,
@@ -343,7 +343,7 @@ private fun DetailContent(
                     }
                 }
             }
-            if (detail.mediaType == MediaType.TV && uiState.seasons.isNotEmpty()) {
+            if (detail.category == MediaCategory.TV && uiState.seasons.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 uiState.nextUnwatchedEpisode?.let { episode ->
                     NextUnwatchedBanner(episode = episode)
@@ -525,7 +525,7 @@ private fun EpisodeCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AsyncImage(
-                model = TmdbImages.stillUrl(episode.stillPath),
+                model = episode.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -638,7 +638,7 @@ private fun ProviderRow(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     AsyncImage(
-                        model = TmdbImages.logoUrl(provider.logoPath),
+                        model = provider.logoUri,
                         contentDescription = provider.name,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -915,16 +915,14 @@ private fun DetailContentPreview() {
         DetailContent(
             uiState = DetailUiState(
                 detail = MediaDetail(
-                    id = 550,
-                    mediaType = MediaType.MOVIE,
+                    reference = MediaReference("tmdb", MediaCategory.MOVIE, "550"),
                     title = "Fight Club",
                     originalTitle = "Fight Club",
-                    overview = "A ticking-time-bomb insomniac and a slippery soap salesman channel primal male aggression into a shocking new form of therapy.",
+                    description = "A ticking-time-bomb insomniac and a slippery soap salesman channel primal male aggression into a shocking new form of therapy.",
                     releaseDate = "1999-10-15",
                     originalLanguage = "en",
-                    runtimeMinutes = 139,
-                    posterPath = null,
-                    backdropPath = null,
+                    artworkUri = null,
+                    backdropUri = null,
                     voteAverage = 8.4,
                     voteCount = 30_000,
                     genres = listOf("Drama"),
@@ -932,10 +930,11 @@ private fun DetailContentPreview() {
                         WatchProvider(
                             providerId = 8,
                             name = "Netflix",
-                            logoPath = null,
+                            logoUri = null,
                             category = ProviderCategory.FLATRATE,
                         ),
                     ),
+                    metadata = MediaMetadata.Video(runtimeMinutes = 139),
                 ),
                 status = MediaStatus.BACKLOG,
                 entryId = 1L,

@@ -5,6 +5,6 @@ import retrofit2.HttpException
 
 fun networkErrorMessage(throwable: Throwable): String = when (throwable) {
     is IOException -> "Check your connection and try again."
-    is HttpException -> "TMDB is unavailable right now. Try again."
+    is HttpException -> "The metadata service is unavailable right now. Try again."
     else -> "Something went wrong. Try again."
 }

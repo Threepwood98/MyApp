@@ -39,8 +39,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.couchlist.app.core.domain.model.LogAction
 import com.couchlist.app.core.domain.model.LogMediaEntry
-import com.couchlist.app.core.domain.model.MediaType
-import com.couchlist.app.core.ui.components.TmdbImages
 import coil3.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,7 +131,7 @@ private fun LogEntryCard(entry: LogMediaEntry) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AsyncImage(
-                model = TmdbImages.posterUrl(entry.posterPath, size = "w92"),
+                model = entry.artworkUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

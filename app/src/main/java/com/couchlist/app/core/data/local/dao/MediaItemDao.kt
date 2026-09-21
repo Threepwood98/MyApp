@@ -4,8 +4,11 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
-import com.couchlist.app.core.domain.model.MediaType
+import com.couchlist.app.core.data.local.entity.MediaItemWithRuntimeRow
+import com.couchlist.app.core.data.local.entity.VideoMetadataEntity
+import com.couchlist.app.core.domain.model.MediaCategory
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -16,26 +19,34 @@ interface MediaItemDao {
 
     @Query(
         "SELECT * FROM media_items " +
-            "WHERE media_type = :mediaType AND tmdb_id = :tmdbId",
+            "WHERE source = :source AND category = :category AND external_id = :externalId",
     )
-    suspend fun getByTmdb(mediaType: MediaType, tmdbId: Long): MediaItemEntity?
+    suspend fun getByReference(
+        source: String,
+        category: MediaCategory,
+        externalId: String,
+    ): MediaItemEntity?
 
     @Query("SELECT * FROM media_items WHERE id = :id")
     suspend fun getById(id: Long): MediaItemEntity?
 
-    @Query("SELECT * FROM media_items WHERE id = :id")
-    fun observeById(id: Long): Flow<MediaItemEntity?>
+    @Query(
+        "SELECT media_items.*, video_metadata.runtime_minutes " +
+            "FROM media_items " +
+            "LEFT JOIN video_metadata ON video_metadata.media_id = media_items.id " +
+            "WHERE media_items.id = :id",
+    )
+    fun observeById(id: Long): Flow<MediaItemWithRuntimeRow?>
 
     @Query(
         "UPDATE media_items SET " +
             "title = :title, " +
             "original_title = :originalTitle, " +
-            "overview = :overview, " +
-            "poster_path = :posterPath, " +
-            "backdrop_path = :backdropPath, " +
+            "description = :description, " +
+            "artwork_uri = :artworkUri, " +
+            "backdrop_uri = :backdropUri, " +
             "release_date = :releaseDate, " +
             "original_language = :originalLanguage, " +
-            "runtime_minutes = :runtimeMinutes, " +
             "external_rating = :externalRating, " +
             "external_vote_count = :externalVoteCount, " +
             "genres = :genres, " +
@@ -47,18 +58,23 @@ interface MediaItemDao {
         id: Long,
         title: String,
         originalTitle: String?,
-        overview: String?,
-        posterPath: String?,
-        backdropPath: String?,
+        description: String?,
+        artworkUri: String?,
+        backdropUri: String?,
         releaseDate: String?,
         originalLanguage: String?,
-        runtimeMinutes: Int?,
         externalRating: Double,
         externalVoteCount: Long,
         genres: String?,
         refreshedAt: Long,
         updatedAt: Long,
     )
+
+    @Upsert
+    suspend fun upsertVideoMetadata(meta: VideoMetadataEntity)
+
+    @Query("SELECT runtime_minutes FROM video_metadata WHERE media_id = :mediaId")
+    suspend fun getRuntimeMinutes(mediaId: Long): Int?
 
     @Query(
         "SELECT media_items.genres FROM media_items " +

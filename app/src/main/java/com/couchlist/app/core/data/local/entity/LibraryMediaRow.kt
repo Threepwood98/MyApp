@@ -11,6 +11,8 @@ import com.couchlist.app.core.domain.model.MediaStatus
 data class LibraryMediaRow(
     @Embedded(prefix = "m_")
     val media: MediaItemEntity,
+    @ColumnInfo(name = "m_runtime_minutes")
+    val runtimeMinutes: Int?,
     @ColumnInfo(name = "lib_id")
     val libraryId: Long,
     @ColumnInfo(name = "lib_status")

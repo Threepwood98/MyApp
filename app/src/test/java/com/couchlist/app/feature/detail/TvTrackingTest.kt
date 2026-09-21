@@ -43,7 +43,7 @@ class TvTrackingTest {
         seasonNumber = number,
         name = if (number == 0) "Specials" else "Season $number",
         overview = null,
-        posterPath = null,
+        artworkUri = null,
         airDate = null,
         episodeCount = 8,
         lastRefreshedAt = null,

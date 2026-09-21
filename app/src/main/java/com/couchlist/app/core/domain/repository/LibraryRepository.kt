@@ -5,6 +5,7 @@ import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.LibraryRemoval
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -35,7 +36,7 @@ interface LibraryRepository {
 
     suspend fun updateNotes(mediaId: Long, notes: String?)
 
-    fun observeAllMediaIds(): Flow<Set<Long>>
+    fun observeAllMediaReferences(): Flow<Set<MediaReference>>
 
     suspend fun createList(
         name: String,

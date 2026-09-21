@@ -4,12 +4,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * Complete library export format. Serialized as JSON for file-based
- * import/export. Uses TMDB IDs (not Room primary keys) for cross-referencing
- * so the file is portable across installations.
+ * import/export. Uses provider-neutral references (source + category +
+ * external_id) for cross-referencing so the file is portable across
+ * installations and metadata providers.
  */
 @Serializable
 data class LibraryExportData(
-    val version: Int = 1,
+    val version: Int = 2,
     val exportedAt: Long = System.currentTimeMillis(),
     val mediaItems: List<ExportMediaItem>,
     val libraryItems: List<ExportLibraryItem>,
@@ -20,13 +21,21 @@ data class LibraryExportData(
 
 @Serializable
 data class ExportMediaItem(
-    val mediaType: String,
-    val tmdbId: Long,
+    // v2 fields (provider-neutral)
+    val source: String? = null,
+    val category: String? = null,
+    val externalId: String? = null,
+    // v1 legacy fields (kept for backward-compatible import)
+    val mediaType: String? = null,
+    val tmdbId: Long? = null,
     val title: String,
     val originalTitle: String? = null,
     val overview: String? = null,
+    val description: String? = null,
     val posterPath: String? = null,
+    val artworkUri: String? = null,
     val backdropPath: String? = null,
+    val backdropUri: String? = null,
     val releaseDate: String? = null,
     val originalLanguage: String? = null,
     val runtimeMinutes: Int? = null,
@@ -35,12 +44,24 @@ data class ExportMediaItem(
     val genres: String? = null,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
-)
+) {
+    fun resolvedSource(): String = source ?: "tmdb"
+
+    fun resolvedCategory(): String = category ?: mediaType ?: "MOVIE"
+
+    fun resolvedExternalId(): String =
+        externalId ?: (tmdbId?.toString() ?: throw IllegalArgumentException("No external ID"))
+}
 
 @Serializable
 data class ExportLibraryItem(
-    val mediaType: String,
-    val tmdbId: Long,
+    // v2 fields
+    val source: String? = null,
+    val category: String? = null,
+    val externalId: String? = null,
+    // v1 legacy fields
+    val mediaType: String? = null,
+    val tmdbId: Long? = null,
     val status: String,
     val progress: Double? = null,
     val personalRating: Int? = null,
@@ -50,7 +71,14 @@ data class ExportLibraryItem(
     val startedAt: Long? = null,
     val completedAt: Long? = null,
     val updatedAt: Long = 0L,
-)
+) {
+    fun resolvedSource(): String = source ?: "tmdb"
+
+    fun resolvedCategory(): String = category ?: mediaType ?: "MOVIE"
+
+    fun resolvedExternalId(): String =
+        externalId ?: (tmdbId?.toString() ?: throw IllegalArgumentException("No external ID"))
+}
 
 @Serializable
 data class ExportList(
@@ -64,20 +92,44 @@ data class ExportList(
 
 @Serializable
 data class ExportListMembership(
+    // v2 fields
+    val source: String? = null,
+    val category: String? = null,
+    val externalId: String? = null,
+    // v1 legacy fields
+    val mediaType: String? = null,
+    val tmdbId: Long? = null,
     val listName: String,
     val listType: String,
-    val mediaType: String,
-    val tmdbId: Long,
-)
+) {
+    fun resolvedSource(): String = source ?: "tmdb"
+
+    fun resolvedCategory(): String = category ?: mediaType ?: "MOVIE"
+
+    fun resolvedExternalId(): String =
+        externalId ?: (tmdbId?.toString() ?: throw IllegalArgumentException("No external ID"))
+}
 
 @Serializable
 data class ExportLogEntry(
-    val mediaType: String,
-    val tmdbId: Long,
+    // v2 fields
+    val source: String? = null,
+    val category: String? = null,
+    val externalId: String? = null,
+    // v1 legacy fields
+    val mediaType: String? = null,
+    val tmdbId: Long? = null,
     val action: String,
     val date: Long,
     val personalRating: Int? = null,
     val notes: String? = null,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
-)
+) {
+    fun resolvedSource(): String = source ?: "tmdb"
+
+    fun resolvedCategory(): String = category ?: mediaType ?: "MOVIE"
+
+    fun resolvedExternalId(): String =
+        externalId ?: (tmdbId?.toString() ?: throw IllegalArgumentException("No external ID"))
+}

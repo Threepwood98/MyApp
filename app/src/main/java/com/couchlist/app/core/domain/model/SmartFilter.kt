@@ -1,6 +1,7 @@
 package com.couchlist.app.core.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 
 /**
@@ -13,7 +14,8 @@ data class SmartFilter(
     val minRating: Int? = null,
     val maxRating: Int? = null,
     val favoriteOnly: Boolean? = null,
-    val mediaTypes: List<MediaType>? = null,
+    @SerialName("mediaTypes")
+    val categories: List<MediaCategory>? = null,
     val genres: List<String>? = null,
 ) {
     fun matches(item: LibraryMedia): Boolean {
@@ -31,8 +33,8 @@ data class SmartFilter(
         favoriteOnly?.let { fav ->
             if (fav && !item.library.favorite) return false
         }
-        mediaTypes?.let { types ->
-            if (item.media.mediaType !in types) return false
+        categories?.let { categories ->
+            if (item.media.category !in categories) return false
         }
         genres?.let { genres ->
             if (genres.none { it in item.media.genres }) return false
@@ -45,7 +47,7 @@ data class SmartFilter(
         minRating?.let { add("Rating $it+") }
         maxRating?.let { add("Rating ≤$it") }
         favoriteOnly?.let { if (it) add("Favorites only") }
-        mediaTypes?.let { add(it.joinToString { t -> t.name }) }
+        categories?.let { add(it.joinToString { category -> category.name }) }
         genres?.let { add(it.joinToString()) }
     }.joinToString(" · ").ifBlank { "All titles" }
 

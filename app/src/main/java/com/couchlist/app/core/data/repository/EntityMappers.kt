@@ -3,6 +3,7 @@ package com.couchlist.app.core.data.repository
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
 import com.couchlist.app.core.data.local.entity.LibraryMediaRow
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
+import com.couchlist.app.core.data.local.entity.MediaItemWithRuntimeRow
 import com.couchlist.app.core.data.local.entity.MediaListEntity
 import com.couchlist.app.core.data.local.entity.MediaListSummaryRow
 import com.couchlist.app.core.data.local.entity.SeasonEntity
@@ -10,30 +11,33 @@ import com.couchlist.app.core.data.local.entity.TvEpisodeWithStateRow
 import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.MediaItem
+import com.couchlist.app.core.domain.model.MediaMetadata
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaList
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.TvEpisode
 import com.couchlist.app.core.domain.model.TvSeason
 
-internal fun MediaItemEntity.toDomain() = MediaItem(
+internal fun MediaItemEntity.toDomain(runtimeMinutes: Int? = null) = MediaItem(
     id = id,
-    mediaType = mediaType,
-    tmdbId = tmdbId,
+    reference = MediaReference(source, category, externalId),
     title = title,
     originalTitle = originalTitle,
-    overview = overview,
-    posterPath = posterPath,
-    backdropPath = backdropPath,
+    description = description,
+    artworkUri = artworkUri,
+    backdropUri = backdropUri,
     releaseDate = releaseDate,
     originalLanguage = originalLanguage,
-    runtimeMinutes = runtimeMinutes,
     externalRating = externalRating,
     externalVoteCount = externalVoteCount,
     genres = genres?.split(", ")?.filter { it.isNotBlank() }.orEmpty(),
+    metadata = MediaMetadata.Video(runtimeMinutes),
     lastRefreshedAt = lastRefreshedAt,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
+
+internal fun MediaItemWithRuntimeRow.toDomain() = media.toDomain(runtimeMinutes)
 
 internal fun LibraryItemEntity.toDomain() = LibraryItem(
     id = id,
@@ -64,7 +68,7 @@ internal fun LibraryItem.toEntity() = LibraryItemEntity(
 )
 
 internal fun LibraryMediaRow.toDomain() = LibraryMedia(
-    media = media.toDomain(),
+    media = media.toDomain(runtimeMinutes),
     library = LibraryItem(
         id = libraryId,
         mediaId = media.id,
@@ -104,7 +108,7 @@ internal fun SeasonEntity.toDomain() = TvSeason(
     seasonNumber = seasonNumber,
     name = name,
     overview = overview,
-    posterPath = posterPath,
+    artworkUri = artworkUri,
     airDate = airDate,
     episodeCount = episodeCount,
     lastRefreshedAt = lastRefreshedAt,
@@ -118,7 +122,7 @@ internal fun TvEpisodeWithStateRow.toDomain() = TvEpisode(
     episodeNumber = episode.episodeNumber,
     title = episode.title,
     overview = episode.overview,
-    stillPath = episode.stillPath,
+    artworkUri = episode.artworkUri,
     airDate = episode.airDate,
     runtimeMinutes = episode.runtimeMinutes,
     isWatched = isWatched,

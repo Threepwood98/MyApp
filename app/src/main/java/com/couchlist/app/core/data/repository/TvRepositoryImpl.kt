@@ -8,12 +8,13 @@ import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.local.entity.EpisodeEntity
 import com.couchlist.app.core.data.local.entity.LogEntryEntity
 import com.couchlist.app.core.data.local.entity.SeasonEntity
+import com.couchlist.app.core.data.remote.provider.MetadataProviderRegistry
 import com.couchlist.app.core.domain.model.LogAction
-import com.couchlist.app.core.domain.model.MediaType
+import com.couchlist.app.core.domain.model.MediaCategory
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.TvEpisode
 import com.couchlist.app.core.domain.model.TvProgress
 import com.couchlist.app.core.domain.model.TvSeason
-import com.couchlist.app.core.domain.repository.MediaRepository
 import com.couchlist.app.core.domain.repository.TvRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -25,7 +26,7 @@ class TvRepositoryImpl @Inject constructor(
     private val mediaItemDao: MediaItemDao,
     private val libraryItemDao: LibraryItemDao,
     private val tvDao: TvDao,
-    private val mediaRepository: MediaRepository,
+    private val providerRegistry: MetadataProviderRegistry,
 ) : TvRepository {
 
     override fun observeSeasons(mediaId: Long): Flow<List<TvSeason>> =
@@ -50,50 +51,47 @@ class TvRepositoryImpl @Inject constructor(
     override suspend fun refreshSeason(mediaId: Long, seasonNumber: Int): Result<Unit> {
         val media = mediaItemDao.getById(mediaId)
             ?: return Result.failure(IllegalArgumentException("Unknown media item"))
-        if (media.mediaType != MediaType.TV) {
+        if (media.category != MediaCategory.TV) {
             return Result.failure(IllegalArgumentException("Seasons are only available for TV"))
         }
-        return mediaRepository.seasonDetails(media.tmdbId, seasonNumber).fold(
-            onSuccess = { details ->
-                try {
-                    database.withTransaction {
-                        val seasonId = tvDao.upsertSeason(
-                            SeasonEntity(
-                                mediaId = mediaId,
-                                seasonNumber = details.season.seasonNumber,
-                                name = details.season.name,
-                                overview = details.season.overview,
-                                posterPath = details.season.posterPath,
-                                airDate = details.season.airDate,
-                                episodeCount = details.season.episodeCount,
-                                lastRefreshedAt = System.currentTimeMillis(),
-                            ),
-                        )
-                        details.episodes.forEach { episode ->
-                            tvDao.upsertEpisode(
-                                EpisodeEntity(
-                                    mediaId = mediaId,
-                                    seasonId = seasonId,
-                                    seasonNumber = episode.seasonNumber,
-                                    episodeNumber = episode.episodeNumber,
-                                    title = episode.title,
-                                    overview = episode.overview,
-                                    stillPath = episode.stillPath,
-                                    airDate = episode.airDate,
-                                    runtimeMinutes = episode.runtimeMinutes,
-                                ),
-                            )
-                        }
-                    }
-                    Result.success(Unit)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Result.failure(e)
+        val reference = MediaReference(media.source, media.category, media.externalId)
+        return try {
+            val details = providerRegistry.seasonDetails(reference, seasonNumber)
+            database.withTransaction {
+                val seasonId = tvDao.upsertSeason(
+                    SeasonEntity(
+                        mediaId = mediaId,
+                        seasonNumber = details.season.seasonNumber,
+                        name = details.season.name,
+                        overview = details.season.overview,
+                        artworkUri = details.season.artworkUri,
+                        airDate = details.season.airDate,
+                        episodeCount = details.season.episodeCount,
+                        lastRefreshedAt = System.currentTimeMillis(),
+                    ),
+                )
+                details.episodes.forEach { episode ->
+                    tvDao.upsertEpisode(
+                        EpisodeEntity(
+                            mediaId = mediaId,
+                            seasonId = seasonId,
+                            seasonNumber = episode.seasonNumber,
+                            episodeNumber = episode.episodeNumber,
+                            title = episode.title,
+                            overview = episode.overview,
+                            artworkUri = episode.artworkUri,
+                            airDate = episode.airDate,
+                            runtimeMinutes = episode.runtimeMinutes,
+                        ),
+                    )
                 }
-            },
-            onFailure = { Result.failure(it) },
-        )
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     override suspend fun setEpisodeWatched(episodeId: Long, watched: Boolean): Result<Unit> =

@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaSearchResult
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
-import com.couchlist.app.core.domain.repository.MediaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -27,7 +27,6 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 @OptIn(FlowPreview::class)
 class SearchViewModel @Inject constructor(
-    private val mediaRepository: MediaRepository,
     private val catalogRepository: CatalogRepository,
     private val libraryRepository: LibraryRepository,
 ) : ViewModel() {
@@ -38,12 +37,12 @@ class SearchViewModel @Inject constructor(
     private val _events = Channel<SearchEvent>(Channel.BUFFERED)
     val events: Flow<SearchEvent> = _events.receiveAsFlow()
 
-    private val libraryMediaIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val libraryMediaReferences = MutableStateFlow<Set<MediaReference>>(emptySet())
 
     init {
         viewModelScope.launch {
-            libraryRepository.observeAllMediaIds().collect { ids ->
-                libraryMediaIds.value = ids
+            libraryRepository.observeAllMediaReferences().collect { references ->
+                libraryMediaReferences.value = references
                 refreshInLibraryStatus()
             }
         }
@@ -107,14 +106,14 @@ class SearchViewModel @Inject constructor(
             return
         }
         _uiState.update { it.copy(isSearching = true, errorMessage = null) }
-        mediaRepository.searchMulti(query.trim())
+        catalogRepository.search(query.trim())
             .onSuccess { results ->
-                val mediaIds = results.map { it.id }.toSet()
-                val foundInLibrary = libraryMediaIds.value.intersect(mediaIds)
+                val references = results.map { it.reference }.toSet()
+                val foundInLibrary = libraryMediaReferences.value.intersect(references)
                 _uiState.update {
                     it.copy(
                         results = results,
-                        inLibraryIds = foundInLibrary,
+                        inLibraryReferences = foundInLibrary,
                         isSearching = false,
                         errorMessage = null,
                     )
@@ -128,10 +127,13 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun refreshInLibraryStatus() {
-        val currentIds = libraryMediaIds.value
+        val currentReferences = libraryMediaReferences.value
         _uiState.update { state ->
             state.copy(
-                inLibraryIds = state.results.map { it.id }.toSet().intersect(currentIds),
+                inLibraryReferences = state.results
+                    .map { it.reference }
+                    .toSet()
+                    .intersect(currentReferences),
             )
         }
     }
@@ -140,7 +142,7 @@ class SearchViewModel @Inject constructor(
 data class SearchUiState(
     val query: String = "",
     val results: List<MediaSearchResult> = emptyList(),
-    val inLibraryIds: Set<Long> = emptySet(),
+    val inLibraryReferences: Set<MediaReference> = emptySet(),
     val isSearching: Boolean = false,
     val errorMessage: String? = null,
 )

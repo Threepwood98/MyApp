@@ -7,8 +7,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Cached TV season metadata. Schema preparation only for now; TV tracking logic
- * lands in a later phase.
+ * Cached TV season metadata.
  */
 @Entity(
     tableName = "seasons",
@@ -34,8 +33,8 @@ data class SeasonEntity(
     val seasonNumber: Int,
     val name: String,
     val overview: String?,
-    @ColumnInfo(name = "poster_path")
-    val posterPath: String?,
+    @ColumnInfo(name = "artwork_uri")
+    val artworkUri: String?,
     @ColumnInfo(name = "air_date")
     val airDate: String?,
     @ColumnInfo(name = "episode_count")

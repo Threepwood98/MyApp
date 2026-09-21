@@ -13,6 +13,7 @@ import com.couchlist.app.core.domain.model.LibraryRemoval
 import com.couchlist.app.core.domain.model.ListMembership
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.SmartFilter
 import com.couchlist.app.core.domain.repository.LibraryRepository
@@ -142,8 +143,12 @@ class LibraryRepositoryImpl @Inject constructor(
         libraryItemDao.updateNotes(mediaId, notes, System.currentTimeMillis())
     }
 
-    override fun observeAllMediaIds(): Flow<Set<Long>> =
-        libraryItemDao.observeAllMediaIds().map { it.toSet() }
+    override fun observeAllMediaReferences(): Flow<Set<MediaReference>> =
+        libraryItemDao.observeAllMediaReferences().map { rows ->
+            rows.mapTo(mutableSetOf()) { row ->
+                MediaReference(row.source, row.category, row.externalId)
+            }
+        }
 
     override suspend fun createList(
         name: String,

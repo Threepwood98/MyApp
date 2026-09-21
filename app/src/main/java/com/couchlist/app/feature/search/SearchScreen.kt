@@ -53,9 +53,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.couchlist.app.core.domain.model.MediaCategory
+import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaSearchResult
-import com.couchlist.app.core.domain.model.MediaType
-import com.couchlist.app.core.ui.components.TmdbImages
 import com.couchlist.app.core.ui.theme.CouchlistTheme
 import coil3.compose.AsyncImage
 
@@ -142,7 +142,7 @@ private fun SearchContent(
                 )
                 else -> SearchResultsGrid(
                     results = uiState.results,
-                    inLibraryIds = uiState.inLibraryIds,
+                    inLibraryReferences = uiState.inLibraryReferences,
                     onAddToWatchlist = onAddToWatchlist,
                     onResultClick = onResultClick,
                 )
@@ -231,7 +231,7 @@ private fun SearchErrorState(
 @Composable
 private fun SearchResultsGrid(
     results: List<MediaSearchResult>,
-    inLibraryIds: Set<Long>,
+    inLibraryReferences: Set<MediaReference>,
     onAddToWatchlist: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
@@ -242,10 +242,10 @@ private fun SearchResultsGrid(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        items(items = results, key = { "${it.mediaType}-${it.id}" }) { result ->
+        items(items = results, key = { it.reference.stableKey }) { result ->
             MediaResultCard(
                 result = result,
-                isInLibrary = result.id in inLibraryIds,
+                isInLibrary = result.reference in inLibraryReferences,
                 onAddToWatchlist = onAddToWatchlist,
                 onResultClick = onResultClick,
             )
@@ -263,7 +263,7 @@ private fun MediaResultCard(
     Column(modifier = Modifier.clickable { onResultClick(result) }) {
         Box {
             AsyncImage(
-                model = TmdbImages.posterUrl(result.posterPath),
+                model = result.artworkUri,
                 contentDescription = result.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -278,7 +278,7 @@ private fun MediaResultCard(
                     .padding(6.dp),
             ) {
                 Text(
-                    text = result.mediaType.name,
+                    text = result.category.name,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
@@ -364,12 +364,11 @@ private fun SearchResultsPreview() {
                 query = "fight club",
                 results = listOf(
                     MediaSearchResult(
-                        id = 550,
-                        mediaType = MediaType.MOVIE,
+                        reference = MediaReference("tmdb", MediaCategory.MOVIE, "550"),
                         title = "Fight Club",
-                        posterPath = null,
+                        artworkUri = null,
                         releaseYear = 1999,
-                        overview = "A ticking-time-bomb insomniac...",
+                        description = "A ticking-time-bomb insomniac...",
                     ),
                 ),
             ),
