@@ -1,8 +1,10 @@
 package com.couchlist.app.feature.library
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,13 +23,23 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -39,6 +51,7 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -46,6 +59,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -65,6 +79,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.MediaListSummary
+import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.nextStatus
 import com.couchlist.app.core.ui.components.TmdbImages
@@ -78,6 +93,17 @@ fun LibraryRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var showCreateListDialog by remember { mutableStateOf(false) }
+
+    if (showCreateListDialog) {
+        CreateListDialog(
+            onDismiss = { showCreateListDialog = false },
+            onConfirm = { name, description, type ->
+                showCreateListDialog = false
+                viewModel.onCreateList(name, description, type)
+            },
+        )
+    }
 
     LaunchedEffect(viewModel) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -94,6 +120,9 @@ fun LibraryRoute(
                             viewModel.onUndo(event.action)
                         }
                     }
+                    is LibraryEvent.ShowMessage -> {
+                        snackbarHostState.showSnackbar(event.message)
+                    }
                 }
             }
         }
@@ -105,10 +134,20 @@ fun LibraryRoute(
         onAdvance = viewModel::onAdvanceStatus,
         onRemove = viewModel::onRemove,
         onItemClick = onItemClick,
+        onSortSelected = viewModel::onSortOptionSelected,
+        onMultiSelectEnter = viewModel::onMultiSelectModeEnter,
+        onMultiSelectExit = viewModel::onMultiSelectModeExit,
+        onItemToggleSelection = viewModel::onItemToggleSelection,
+        onSelectAll = viewModel::onSelectAll,
+        onBatchMove = viewModel::onBatchMoveStatus,
+        onBatchRemove = viewModel::onBatchRemove,
+        onStatusTabChanged = viewModel::onStatusTabChanged,
+        onCreateListClick = { showCreateListDialog = true },
+        onDeleteList = viewModel::onDeleteList,
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryContent(
     uiState: LibraryUiState,
@@ -116,14 +155,82 @@ private fun LibraryContent(
     onAdvance: (LibraryMedia) -> Unit,
     onRemove: (LibraryMedia) -> Unit,
     onItemClick: (LibraryMedia) -> Unit,
+    onSortSelected: (SortOption) -> Unit,
+    onMultiSelectEnter: () -> Unit,
+    onMultiSelectExit: () -> Unit,
+    onItemToggleSelection: (Long) -> Unit,
+    onSelectAll: () -> Unit,
+    onBatchMove: () -> Unit,
+    onBatchRemove: () -> Unit,
+    onStatusTabChanged: (MediaStatus) -> Unit,
+    onCreateListClick: () -> Unit,
+    onDeleteList: (Long) -> Unit,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val statuses = MediaStatus.entries
     val selectedStatus = statuses[selectedTab]
-    val statusItems = uiState.items.filter { it.library.status == selectedStatus }
+    val allSortedItems = uiState.items.let { items ->
+        when (uiState.sortOption) {
+            SortOption.DATE_ADDED -> items.sortedByDescending { it.library.addedAt }
+            SortOption.TITLE -> items.sortedBy { it.media.title.lowercase() }
+            SortOption.RATING -> items.sortedByDescending { it.library.personalRating ?: 0 }
+        }
+    }
+    val statusItems = allSortedItems.filter { it.library.status == selectedStatus }
+
+    LaunchedEffect(selectedTab) {
+        onStatusTabChanged(selectedStatus)
+    }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(text = "Library") }) },
+        topBar = {
+            if (uiState.isMultiSelectMode) {
+                TopAppBar(
+                    title = { Text(text = "${uiState.selectedIds.size} selected") },
+                    navigationIcon = {
+                        IconButton(onClick = onMultiSelectExit) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Exit selection",
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onSelectAll) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Select all",
+                            )
+                        }
+                        IconButton(onClick = onBatchRemove) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = "Remove selected",
+                            )
+                        }
+                        if (selectedStatus.nextStatus != null) {
+                            IconButton(onClick = onBatchMove) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Move selected",
+                                )
+                            }
+                        }
+                    },
+                )
+            } else {
+                TopAppBar(title = { Text(text = "Library") })
+            }
+        },
+        floatingActionButton = {
+            if (!uiState.isMultiSelectMode) {
+                ExtendedFloatingActionButton(
+                    onClick = onCreateListClick,
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text("New list") },
+                )
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -131,7 +238,7 @@ private fun LibraryContent(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            if (uiState.lists.isNotEmpty()) {
+            if (uiState.lists.isNotEmpty() && !uiState.isMultiSelectMode) {
                 Text(
                     text = "Your lists",
                     style = MaterialTheme.typography.titleLarge,
@@ -144,11 +251,20 @@ private fun LibraryContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(uiState.lists, key = { it.list.id }) { summary ->
-                        ListSummaryCard(summary)
+                        ListSummaryCard(
+                            summary = summary,
+                            onDelete = { onDeleteList(summary.list.id) },
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
+            SortBar(
+                selectedOption = uiState.sortOption,
+                onOptionSelected = onSortSelected,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
             PrimaryTabRow(selectedTabIndex = selectedTab) {
                 statuses.forEachIndexed { index, status ->
                     Tab(
@@ -161,9 +277,13 @@ private fun LibraryContent(
             StatusList(
                 status = selectedStatus,
                 items = statusItems,
+                isMultiSelectMode = uiState.isMultiSelectMode,
+                selectedIds = uiState.selectedIds,
                 onAdvance = onAdvance,
                 onRemove = onRemove,
                 onItemClick = onItemClick,
+                onItemLongClick = onMultiSelectEnter,
+                onItemToggleSelection = onItemToggleSelection,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -171,32 +291,101 @@ private fun LibraryContent(
 }
 
 @Composable
-private fun ListSummaryCard(summary: MediaListSummary) {
-    ElevatedCard(modifier = Modifier.width(172.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = summary.list.name,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${summary.itemCount} ${if (summary.itemCount == 1) "title" else "titles"}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun SortBar(
+    selectedOption: SortOption,
+    onOptionSelected: (SortOption) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SortOption.entries.forEach { option ->
+            FilterChip(
+                selected = selectedOption == option,
+                onClick = { onOptionSelected(option) },
+                label = { Text(option.displayName) },
             )
         }
     }
 }
 
 @Composable
+private fun ListSummaryCard(
+    summary: MediaListSummary,
+    onDelete: () -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    ElevatedCard(modifier = Modifier.width(172.dp)) {
+        Column(
+            modifier = Modifier
+                .clickable { }
+                .padding(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = summary.list.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        Text(
+                            text = "\u2022\u2022\u2022",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            },
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${summary.itemCount} ${if (summary.itemCount == 1) "title" else "titles"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = summary.list.type.name,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun StatusList(
     status: MediaStatus,
     items: List<LibraryMedia>,
+    isMultiSelectMode: Boolean,
+    selectedIds: Set<Long>,
     onAdvance: (LibraryMedia) -> Unit,
     onRemove: (LibraryMedia) -> Unit,
     onItemClick: (LibraryMedia) -> Unit,
+    onItemLongClick: () -> Unit,
+    onItemToggleSelection: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dismissedItems = remember { mutableStateMapOf<Long, Boolean>() }
@@ -227,25 +416,37 @@ private fun StatusList(
     } else {
         LazyColumn(modifier = modifier.fillMaxSize()) {
             items(visibleItems, key = { it.library.id }) { item ->
-                SwipeableLibraryRow(
-                    item = item,
-                    onAdvance = onAdvance,
-                    onRemove = onRemove,
-                    onItemClick = onItemClick,
-                    onDismissed = { dismissedItems[item.library.id] = true },
-                )
+                if (isMultiSelectMode) {
+                    SelectableLibraryRow(
+                        item = item,
+                        isSelected = item.media.id in selectedIds,
+                        onToggleSelection = { onItemToggleSelection(item.media.id) },
+                        onItemClick = { onItemClick(item) },
+                    )
+                } else {
+                    SwipeableLibraryRow(
+                        item = item,
+                        onAdvance = onAdvance,
+                        onRemove = onRemove,
+                        onItemClick = onItemClick,
+                        onItemLongClick = onItemLongClick,
+                        onDismissed = { dismissedItems[item.library.id] = true },
+                    )
+                }
                 HorizontalDivider()
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SwipeableLibraryRow(
     item: LibraryMedia,
     onAdvance: (LibraryMedia) -> Unit,
     onRemove: (LibraryMedia) -> Unit,
     onItemClick: (LibraryMedia) -> Unit,
+    onItemLongClick: () -> Unit,
     onDismissed: () -> Unit,
 ) {
     val dismissState = rememberSwipeToDismissBoxState()
@@ -262,7 +463,11 @@ private fun SwipeableLibraryRow(
         },
         backgroundContent = { SwipeBackground() },
     ) {
-        LibraryMediaRow(item = item, onClick = { onItemClick(item) })
+        LibraryMediaRow(
+            item = item,
+            onClick = { onItemClick(item) },
+            onLongClick = onItemLongClick,
+        )
     }
 }
 
@@ -300,16 +505,21 @@ private fun SwipeBackground() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryMediaRow(
     item: LibraryMedia,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -345,7 +555,7 @@ private fun LibraryMediaRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${item.media.mediaType.name} · Added ${DateUtils.getRelativeTimeSpanString(item.library.addedAt)}",
+                text = "${item.media.mediaType.name} \u00B7 Added ${DateUtils.getRelativeTimeSpanString(item.library.addedAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -353,6 +563,143 @@ private fun LibraryMediaRow(
             )
         }
     }
+}
+
+@Composable
+private fun SelectableLibraryRow(
+    item: LibraryMedia,
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit,
+    onItemClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                else MaterialTheme.colorScheme.surface,
+            )
+            .clickable { onToggleSelection() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.Checkbox(
+            checked = isSelected,
+            onCheckedChange = { onToggleSelection() },
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        if (item.media.posterPath != null) {
+            AsyncImage(
+                model = TmdbImages.posterUrl(item.media.posterPath, "w154"),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(48.dp)
+                    .height(72.dp)
+                    .clip(MaterialTheme.shapes.extraSmall),
+            )
+        } else {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = MaterialTheme.shapes.extraSmall,
+                modifier = Modifier
+                    .width(48.dp)
+                    .height(72.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.media.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${item.media.mediaType.name} \u00B7 ${item.library.status.displayName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CreateListDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, description: String?, type: MediaListType) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf(MediaListType.COLLECTION) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create new list") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("List name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "List type",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selectedType == MediaListType.TODO,
+                        onClick = { selectedType = MediaListType.TODO },
+                        label = { Text("TODO") },
+                    )
+                    FilterChip(
+                        selected = selectedType == MediaListType.COLLECTION,
+                        onClick = { selectedType = MediaListType.COLLECTION },
+                        label = { Text("Collection") },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onConfirm(
+                            name.trim(),
+                            description.trim().ifBlank { null },
+                            selectedType,
+                        )
+                    }
+                },
+                enabled = name.isNotBlank(),
+            ) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 private fun emptyHint(status: MediaStatus): String = when (status) {

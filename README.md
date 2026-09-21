@@ -26,8 +26,14 @@ titles and fetch details.
 
 - **Home dashboard.** Continue Watching, Recently Added, and Recently Completed
   sections keep the most useful titles close.
-- **Library.** Default Watchlist and The Pile list summaries plus Backlog /
-  Watching / Completed / Abandoned status tabs.
+- **Library.** Custom lists (TODO or Collection type) with item counts, plus
+  Backlog / Watching / Completed / Abandoned status tabs.
+  - **Create lists** via the FAB — give it a name, optional description, and
+    choose TODO or Collection type.
+  - **Delete lists** from the overflow menu on each list card.
+  - **Sort** by Date added, Title, or Rating using the filter chips.
+  - **Multi-select** — long-press any item to enter selection mode, then batch
+    move or batch remove. Select All from the top bar.
   - **Swipe right** advances a title to its next status.
   - **Swipe left** removes it from the library and its lists.
   - Both actions offer **Undo** from the snackbar.

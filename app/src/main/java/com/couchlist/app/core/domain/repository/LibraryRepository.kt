@@ -4,6 +4,7 @@ import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.LibraryRemoval
 import com.couchlist.app.core.domain.model.MediaListSummary
+import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -35,4 +36,16 @@ interface LibraryRepository {
     suspend fun updateNotes(mediaId: Long, notes: String?)
 
     fun observeAllMediaIds(): Flow<Set<Long>>
+
+    suspend fun createList(name: String, description: String?, type: MediaListType): Long
+
+    suspend fun deleteList(listId: Long)
+
+    suspend fun addToList(listId: Long, mediaId: Long)
+
+    suspend fun removeFromList(listId: Long, mediaId: Long)
+
+    fun observeListMediaIds(listId: Long): Flow<List<Long>>
+
+    suspend fun getListName(listId: Long): String?
 }

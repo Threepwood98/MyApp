@@ -144,6 +144,53 @@ class LibraryRepositoryImpl @Inject constructor(
     override fun observeAllMediaIds(): Flow<Set<Long>> =
         libraryItemDao.observeAllMediaIds().map { it.toSet() }
 
+    override suspend fun createList(
+        name: String,
+        description: String?,
+        type: MediaListType,
+    ): Long {
+        val now = System.currentTimeMillis()
+        val insertedId = mediaListDao.insertListIgnore(
+            MediaListEntity(
+                name = name,
+                description = description,
+                type = type,
+                coverMediaId = null,
+                isPinned = false,
+                sortOrder = 99,
+                smartFilterJson = null,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        return insertedId.takeIf { it != -1L }
+            ?: checkNotNull(mediaListDao.findListId(name, type))
+    }
+
+    override suspend fun deleteList(listId: Long) {
+        mediaListDao.deleteList(listId)
+    }
+
+    override suspend fun addToList(listId: Long, mediaId: Long) {
+        mediaListDao.insertJoinIgnore(
+            MediaListJoinEntity(
+                listId = listId,
+                mediaId = mediaId,
+                addedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    override suspend fun removeFromList(listId: Long, mediaId: Long) {
+        mediaListDao.removeFromList(listId, mediaId)
+    }
+
+    override fun observeListMediaIds(listId: Long): Flow<List<Long>> =
+        mediaListDao.observeListMediaIds(listId)
+
+    override suspend fun getListName(listId: Long): String? =
+        mediaListDao.getListById(listId)?.name
+
     private suspend fun ensureList(
         name: String,
         type: MediaListType,

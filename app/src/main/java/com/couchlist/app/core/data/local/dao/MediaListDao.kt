@@ -37,4 +37,19 @@ interface MediaListDao {
 
     @Query("DELETE FROM media_list_joins WHERE media_id = :mediaId")
     suspend fun deleteMemberships(mediaId: Long)
+
+    @Query("DELETE FROM lists WHERE id = :listId")
+    suspend fun deleteList(listId: Long)
+
+    @Query("DELETE FROM media_list_joins WHERE list_id = :listId AND media_id = :mediaId")
+    suspend fun removeFromList(listId: Long, mediaId: Long)
+
+    @Query("SELECT media_id FROM media_list_joins WHERE list_id = :listId")
+    fun observeListMediaIds(listId: Long): Flow<List<Long>>
+
+    @Query("SELECT * FROM media_list_joins WHERE list_id = :listId")
+    suspend fun getListMemberships(listId: Long): List<MediaListJoinEntity>
+
+    @Query("SELECT * FROM lists WHERE id = :listId")
+    suspend fun getListById(listId: Long): MediaListEntity?
 }
