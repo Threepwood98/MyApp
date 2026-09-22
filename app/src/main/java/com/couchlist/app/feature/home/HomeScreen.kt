@@ -52,6 +52,8 @@ import com.couchlist.app.core.domain.model.MediaMetadata
 import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.ui.theme.CouchlistTheme
+import com.couchlist.app.core.ui.components.MediaProgressRing
+import com.couchlist.app.core.ui.components.MediaProgressRingSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -214,27 +216,36 @@ private fun DashboardCard(
             .width(136.dp)
             .clickable(onClick = onClick),
     ) {
-        if (item.media.artworkUri != null) {
-            AsyncImage(
-                model = item.media.artworkUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f),
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
+        Box {
+            if (item.media.artworkUri != null) {
+                AsyncImage(
+                    model = item.media.artworkUri,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(36.dp),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
+            }
+            item.progress?.let { progress ->
+                MediaProgressRing(
+                    progress = progress,
+                    size = MediaProgressRingSize.COMPACT,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                 )
             }
         }
@@ -247,7 +258,7 @@ private fun DashboardCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = when (item.library.status) {
+                text = when (item.status) {
                     MediaStatus.WATCHING -> "In progress"
                     MediaStatus.COMPLETED -> "Completed"
                     else -> DateUtils.getRelativeTimeSpanString(item.library.addedAt).toString()
@@ -298,14 +309,10 @@ private val sampleLibraryMedia = LibraryMedia(
     library = LibraryItem(
         id = 1,
         mediaId = 1,
-        status = MediaStatus.WATCHING,
-        progress = null,
         personalRating = null,
         favorite = false,
         notes = null,
         addedAt = 1,
-        startedAt = 1,
-        completedAt = null,
         updatedAt = 1,
     ),
 )

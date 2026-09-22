@@ -7,8 +7,12 @@ import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.repository.ExportImportRepositoryImpl
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
+import com.couchlist.app.core.data.repository.TrackingRepositoryImpl
 import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaListType
+import com.couchlist.app.core.domain.model.TrackingDetails
+import com.couchlist.app.core.domain.model.TrackingCheckpointKind
+import com.couchlist.app.core.domain.model.TrackingMode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -26,6 +30,7 @@ class ExportImportRepositoryIntegrationTest {
     private lateinit var database: CouchlistDatabase
     private lateinit var libraryRepository: LibraryRepositoryImpl
     private lateinit var exportImportRepository: ExportImportRepositoryImpl
+    private lateinit var trackingRepository: TrackingRepositoryImpl
 
     @Before
     fun setUp() {
@@ -37,6 +42,7 @@ class ExportImportRepositoryIntegrationTest {
             database = database,
             libraryItemDao = database.libraryItemDao(),
             mediaListDao = database.mediaListDao(),
+            trackingDao = database.trackingDao(),
         )
         exportImportRepository = ExportImportRepositoryImpl(
             database = database,
@@ -44,6 +50,12 @@ class ExportImportRepositoryIntegrationTest {
             libraryItemDao = database.libraryItemDao(),
             mediaListDao = database.mediaListDao(),
             logEntryDao = database.logEntryDao(),
+            trackingDao = database.trackingDao(),
+        )
+        trackingRepository = TrackingRepositoryImpl(
+            database = database,
+            libraryItemDao = database.libraryItemDao(),
+            trackingDao = database.trackingDao(),
         )
     }
 
@@ -53,7 +65,7 @@ class ExportImportRepositoryIntegrationTest {
     }
 
     @Test
-    fun versionThreeRoundTripPreservesGroupsListsMembershipsAndPile() = runBlocking {
+    fun versionFourRoundTripPreservesListsAndTracking() = runBlocking {
         val mediaId = insertMedia("42")
         val groupId = libraryRepository.createGroup("Movies")
         val listId = libraryRepository.createList(
@@ -64,6 +76,13 @@ class ExportImportRepositoryIntegrationTest {
         )
         libraryRepository.addToList(listId, mediaId)
         libraryRepository.addToPile(mediaId)
+        val libraryItemId = trackingRepository.start(
+            mediaId = mediaId,
+            mode = TrackingMode.SIMPLE_COUNTER,
+            counterTotal = 10.0,
+            counterUnit = "chapters",
+        )
+        trackingRepository.updateCounter(libraryItemId, 4.0, 10.0, "chapters")
 
         val exported = exportImportRepository.exportToJson()
         val nonCanonicalPileExport = exported.replace(
@@ -85,6 +104,11 @@ class ExportImportRepositoryIntegrationTest {
         assertTrue(pile.list.isPinned)
         assertEquals(1, pile.itemCount)
         assertEquals(1, libraryRepository.observeListItems(importedList.list.id).first().size)
+        val importedMediaId = libraryRepository.observeListItems(importedList.list.id).first().single().media.id
+        val tracking = trackingRepository.observeCurrentByMediaId(importedMediaId).first()
+        val counter = tracking?.details as TrackingDetails.SimpleCounter
+        assertEquals(4.0, counter.current, 0.0)
+        assertEquals(10.0, counter.total ?: 0.0, 0.0)
     }
 
     @Test
@@ -132,6 +156,73 @@ class ExportImportRepositoryIntegrationTest {
         assertEquals(1, legacyList.itemCount)
         assertEquals(1, libraryRepository.observeListItems(legacyList.list.id).first().size)
         assertEquals(1, lists.count { it.list.type == MediaListType.PILE })
+    }
+
+    @Test
+    fun versionFourRoundTripPreservesEveryTrackingDetailTable() = runBlocking {
+        val checklistMediaId = insertMedia("checklist")
+        val checklistLibraryId = trackingRepository.start(checklistMediaId, TrackingMode.CHECKLIST)
+        val groupId = trackingRepository.addCheckpoint(
+            checklistLibraryId,
+            "Season 1",
+            kind = TrackingCheckpointKind.GROUP,
+            stableKey = "season:1",
+        )
+        val itemId = trackingRepository.addCheckpoint(
+            checklistLibraryId,
+            "Episode 1",
+            parentId = groupId,
+            stableKey = "episode:s1:e1",
+        )
+        trackingRepository.setCheckpointCompleted(itemId, true)
+
+        val quickMediaId = insertMedia("quick")
+        val quickLibraryId = trackingRepository.start(quickMediaId, TrackingMode.QUICK_LOG)
+        trackingRepository.addQuickLog(quickLibraryId, "Watched with friends")
+
+        val journalMediaId = insertMedia("journal")
+        val journalLibraryId = trackingRepository.start(journalMediaId, TrackingMode.JOURNAL)
+        trackingRepository.addJournalEntry(journalLibraryId, "Reached Act II", "After the bridge")
+
+        val enjoyingMediaId = insertMedia("enjoying")
+        trackingRepository.start(enjoyingMediaId, TrackingMode.JUST_ENJOYING)
+
+        exportImportRepository.importFromJson(exportImportRepository.exportToJson())
+
+        val checklistLocalId = checkNotNull(
+            database.mediaItemDao().getByReference("tmdb", MediaCategory.MOVIE, "checklist"),
+        ).id
+        val checklist = trackingRepository.observeCurrentByMediaId(checklistLocalId).first()
+        val checkpoints = (checklist?.details as TrackingDetails.Checklist).checkpoints
+        assertEquals(2, checkpoints.size)
+        assertEquals("season:1", checkpoints.single { it.kind == TrackingCheckpointKind.GROUP }.stableKey)
+        assertNotNull(checkpoints.single { it.kind == TrackingCheckpointKind.ITEM }.completedAt)
+
+        val quickLocalId = checkNotNull(
+            database.mediaItemDao().getByReference("tmdb", MediaCategory.MOVIE, "quick"),
+        ).id
+        val quick = trackingRepository.observeCurrentByMediaId(quickLocalId).first()
+        assertEquals(
+            "Watched with friends",
+            (quick?.details as TrackingDetails.QuickLog).entries.single().note,
+        )
+
+        val journalLocalId = checkNotNull(
+            database.mediaItemDao().getByReference("tmdb", MediaCategory.MOVIE, "journal"),
+        ).id
+        val journal = trackingRepository.observeCurrentByMediaId(journalLocalId).first()
+        assertEquals(
+            "Reached Act II",
+            (journal?.details as TrackingDetails.Journal).entries.single().title,
+        )
+
+        val enjoyingLocalId = checkNotNull(
+            database.mediaItemDao().getByReference("tmdb", MediaCategory.MOVIE, "enjoying"),
+        ).id
+        assertEquals(
+            TrackingDetails.JustEnjoying,
+            trackingRepository.observeCurrentByMediaId(enjoyingLocalId).first()?.details,
+        )
     }
 
     @Test

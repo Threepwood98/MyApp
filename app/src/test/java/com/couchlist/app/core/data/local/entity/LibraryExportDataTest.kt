@@ -12,7 +12,7 @@ class LibraryExportDataTest {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     @Test
-    fun `v3 export includes source category and externalId`() {
+    fun `v4 export includes source category and externalId`() {
         val export = LibraryExportData(
             mediaItems = listOf(
                 ExportMediaItem(
@@ -31,7 +31,7 @@ class LibraryExportDataTest {
         assertTrue(encoded.contains("\"source\""))
         assertTrue(encoded.contains("\"category\""))
         assertTrue(encoded.contains("\"externalId\""))
-        assertEquals(3, export.version)
+        assertEquals(4, export.version)
     }
 
     @Test
@@ -66,6 +66,7 @@ class LibraryExportDataTest {
     @Test
     fun `v3 export round trip preserves all fields`() {
         val export = LibraryExportData(
+            version = 3,
             mediaItems = listOf(
                 ExportMediaItem(
                     source = "tmdb",
@@ -156,6 +157,7 @@ class LibraryExportDataTest {
     @Test
     fun `v3 export preserves group and stable list references`() {
         val export = LibraryExportData(
+            version = 3,
             mediaItems = emptyList(),
             libraryItems = emptyList(),
             listGroups = listOf(ExportListGroup(id = 4, name = "Weekend", sortOrder = 1)),

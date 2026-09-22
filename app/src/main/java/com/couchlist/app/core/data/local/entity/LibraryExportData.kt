@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class LibraryExportData(
-    val version: Int = 3,
+    val version: Int = 4,
     val exportedAt: Long = System.currentTimeMillis(),
     val mediaItems: List<ExportMediaItem>,
     val libraryItems: List<ExportLibraryItem>,
@@ -18,6 +18,11 @@ data class LibraryExportData(
     val lists: List<ExportList>,
     val listMemberships: List<ExportListMembership>,
     val logEntries: List<ExportLogEntry>,
+    val trackingSessions: List<ExportTrackingSession> = emptyList(),
+    val trackingCounters: List<ExportTrackingCounter> = emptyList(),
+    val trackingCheckpoints: List<ExportTrackingCheckpoint> = emptyList(),
+    val trackingQuickLogs: List<ExportTrackingQuickLog> = emptyList(),
+    val trackingJournalEntries: List<ExportTrackingJournalEntry> = emptyList(),
 )
 
 @Serializable
@@ -72,7 +77,7 @@ data class ExportLibraryItem(
     // v1 legacy fields
     val mediaType: String? = null,
     val tmdbId: Long? = null,
-    val status: String,
+    val status: String? = null,
     val progress: Double? = null,
     val personalRating: Int? = null,
     val favorite: Boolean = false,
@@ -89,6 +94,68 @@ data class ExportLibraryItem(
     fun resolvedExternalId(): String =
         externalId ?: (tmdbId?.toString() ?: throw IllegalArgumentException("No external ID"))
 }
+
+@Serializable
+data class ExportTrackingSession(
+    val id: Long,
+    val source: String,
+    val category: String,
+    val externalId: String,
+    val mode: String,
+    val state: String,
+    val isCurrent: Boolean,
+    val startedAt: Long,
+    val endedAt: Long? = null,
+    val legacyProgressFraction: Double? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class ExportTrackingCounter(
+    val sessionId: Long,
+    val current: Double,
+    val total: Double? = null,
+    val unit: String? = null,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class ExportTrackingCheckpoint(
+    val id: Long,
+    val sessionId: Long,
+    val stableKey: String,
+    val parentId: Long? = null,
+    val kind: String,
+    val origin: String,
+    val label: String,
+    val sortOrder: Int,
+    val completedAt: Long? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class ExportTrackingQuickLog(
+    val id: Long,
+    val sessionId: Long,
+    val occurredAt: Long,
+    val note: String? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class ExportTrackingJournalEntry(
+    val id: Long,
+    val sessionId: Long,
+    val title: String,
+    val occurredAt: Long,
+    val notes: String? = null,
+    val imageUri: String? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
 
 @Serializable
 data class ExportList(

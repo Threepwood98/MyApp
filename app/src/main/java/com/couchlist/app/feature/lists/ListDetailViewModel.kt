@@ -8,7 +8,10 @@ import com.couchlist.app.core.domain.model.MediaList
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.defaultTrackingMode
+import com.couchlist.app.core.domain.model.defaultTrackingUnit
 import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.TrackingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +27,7 @@ import kotlinx.coroutines.launch
 class ListDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: LibraryRepository,
+    private val trackingRepository: TrackingRepository,
 ) : ViewModel() {
 
     private val listId: Long = savedStateHandle.get<Long>("listId") ?: -1L
@@ -87,6 +91,33 @@ class ListDetailViewModel @Inject constructor(
             _events.send(ListDetailEvent.ShowMessage("Moved ${item.media.title}"))
         }
     }
+
+    fun startTracking(item: LibraryMedia) {
+        viewModelScope.launch {
+            trackingRepository.start(
+                mediaId = item.media.id,
+                mode = item.media.category.defaultTrackingMode,
+                counterUnit = item.media.category.defaultTrackingUnit,
+            )
+            _events.send(ListDetailEvent.ShowMessage("Started tracking ${item.media.title}"))
+        }
+    }
+
+    fun pauseTracking(item: LibraryMedia) {
+        viewModelScope.launch { trackingRepository.pause(item.library.id) }
+    }
+
+    fun resumeTracking(item: LibraryMedia) {
+        viewModelScope.launch { trackingRepository.resume(item.library.id) }
+    }
+
+    fun completeTracking(item: LibraryMedia) {
+        viewModelScope.launch { trackingRepository.complete(item.library.id) }
+    }
+
+    fun abandonTracking(item: LibraryMedia) {
+        viewModelScope.launch { trackingRepository.abandon(item.library.id) }
+    }
 }
 
 data class ListDetailUiState(
@@ -98,7 +129,7 @@ data class ListDetailUiState(
 ) {
     val visibleItems: List<LibraryMedia>
         get() = if (list?.type == MediaListType.TODO && !showCompleted) {
-            items.filterNot { it.library.status == MediaStatus.COMPLETED }
+            items.filterNot { it.status == MediaStatus.COMPLETED }
         } else {
             items
         }

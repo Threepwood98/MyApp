@@ -72,6 +72,15 @@ interface MediaListDao {
             "INNER JOIN library_items ON library_items.id = media_list_joins.library_item_id " +
             "INNER JOIN media_items ON library_items.media_id = media_items.id " +
             "LEFT JOIN video_metadata ON video_metadata.media_id = media_items.id " +
+            "LEFT JOIN tracking_sessions ON tracking_sessions.library_item_id = library_items.id " +
+            "AND tracking_sessions.current_slot = 1 " +
+            "LEFT JOIN tracking_counters ON tracking_counters.session_id = tracking_sessions.id " +
+            "LEFT JOIN (" +
+            "SELECT session_id, COUNT(*) AS total_count, " +
+            "SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_count " +
+            "FROM tracking_checkpoints WHERE kind = 'ITEM' GROUP BY session_id" +
+            ") tracking_checkpoint_progress " +
+            "ON tracking_checkpoint_progress.session_id = tracking_sessions.id " +
             "WHERE media_list_joins.list_id = :listId " +
             "ORDER BY media_list_joins.added_at DESC, media_list_joins.id DESC",
     )

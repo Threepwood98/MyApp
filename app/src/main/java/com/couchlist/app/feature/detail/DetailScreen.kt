@@ -77,11 +77,14 @@ import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaMetadata
 import com.couchlist.app.core.domain.model.MediaReference
-import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.ProviderCategory
+import com.couchlist.app.core.domain.model.TrackingMode
+import com.couchlist.app.core.domain.model.TrackingState
 import com.couchlist.app.core.domain.model.TvEpisode
 import com.couchlist.app.core.domain.model.TvSeason
 import com.couchlist.app.core.domain.model.WatchProvider
+import com.couchlist.app.core.domain.model.defaultTrackingMode
+import com.couchlist.app.core.domain.model.defaultTrackingUnit
 import com.couchlist.app.core.ui.theme.CouchlistTheme
 import coil3.compose.AsyncImage
 
@@ -155,7 +158,7 @@ fun DetailRoute(
                     }
                 },
                 actions = {
-                    if (uiState.status != null) {
+                    if (uiState.entryId != null) {
                         IconButton(onClick = viewModel::onToggleFavorite) {
                             Icon(
                                 imageVector = if (uiState.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -190,7 +193,16 @@ fun DetailRoute(
                     onAddToWatchlist = viewModel::onAddToWatchlist,
                     onAddToPile = viewModel::onAddToPile,
                     onManageLists = { showListSheet = true },
-                    onSetStatus = viewModel::onSetStatus,
+                    onStartTracking = viewModel::onStartTracking,
+                    onPauseTracking = viewModel::onPauseTracking,
+                    onResumeTracking = viewModel::onResumeTracking,
+                    onCompleteTracking = viewModel::onCompleteTracking,
+                    onAbandonTracking = viewModel::onAbandonTracking,
+                    onUpdateCounter = viewModel::onUpdateCounter,
+                    onAddCheckpoint = viewModel::onAddCheckpoint,
+                    onCheckpointCompleted = viewModel::onCheckpointCompleted,
+                    onAddQuickLog = viewModel::onAddQuickLog,
+                    onAddJournalEntry = viewModel::onAddJournalEntry,
                     onRemoveFromWatchlist = viewModel::onRemoveFromWatchlist,
                     onMarkAsWatchedClick = { showRatingDialog = true },
                     onEditRating = { showEditRatingDialog = true },
@@ -226,7 +238,16 @@ private fun DetailContent(
     onAddToWatchlist: () -> Unit,
     onAddToPile: () -> Unit,
     onManageLists: () -> Unit,
-    onSetStatus: (MediaStatus) -> Unit,
+    onStartTracking: (TrackingMode, Double?, String?) -> Unit,
+    onPauseTracking: () -> Unit,
+    onResumeTracking: () -> Unit,
+    onCompleteTracking: () -> Unit,
+    onAbandonTracking: () -> Unit,
+    onUpdateCounter: (Double, Double?, String?) -> Unit,
+    onAddCheckpoint: (String) -> Unit,
+    onCheckpointCompleted: (Long, Boolean) -> Unit,
+    onAddQuickLog: (String?) -> Unit,
+    onAddJournalEntry: (String, String?) -> Unit,
     onRemoveFromWatchlist: () -> Unit,
     onMarkAsWatchedClick: () -> Unit,
     onEditRating: () -> Unit,
@@ -293,7 +314,7 @@ private fun DetailContent(
                     )
                 }
             }
-            if (uiState.status != null) {
+            if (uiState.entryId != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 PersonalRatingRow(
                     rating = uiState.personalRating,
@@ -306,6 +327,22 @@ private fun DetailContent(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
+            TrackingSection(
+                session = uiState.tracking,
+                defaultMode = detail.category.defaultTrackingMode,
+                defaultUnit = detail.category.defaultTrackingUnit,
+                onStart = onStartTracking,
+                onPause = onPauseTracking,
+                onResume = onResumeTracking,
+                onComplete = onCompleteTracking,
+                onAbandon = onAbandonTracking,
+                onUpdateCounter = onUpdateCounter,
+                onAddCheckpoint = onAddCheckpoint,
+                onCheckpointCompleted = onCheckpointCompleted,
+                onAddQuickLog = onAddQuickLog,
+                onAddJournalEntry = onAddJournalEntry,
+            )
+            Spacer(modifier = Modifier.height(24.dp))
             if (!detail.description.isNullOrBlank()) {
                 Text(
                     text = "Overview",
@@ -320,7 +357,7 @@ private fun DetailContent(
             Spacer(modifier = Modifier.height(24.dp))
             Text(text = "Library", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
-            if (uiState.status == null) {
+            if (uiState.entryId == null) {
                 Button(
                     onClick = onAddToPile,
                     modifier = Modifier.fillMaxWidth(),
@@ -334,16 +371,6 @@ private fun DetailContent(
                 OutlinedButton(onClick = onManageLists, modifier = Modifier.fillMaxWidth()) {
                     Text(text = "Manage lists")
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(MediaStatus.entries) { status ->
-                        FilterChip(
-                            selected = uiState.status == status,
-                            onClick = { onSetStatus(status) },
-                            label = { Text(text = status.displayName) },
-                        )
-                    }
-                }
                 TextButton(onClick = onRemoveFromWatchlist) {
                     Text(text = "Remove from Library")
                 }
@@ -356,7 +383,7 @@ private fun DetailContent(
                 ) {
                     Text(text = "Mark as watched")
                 }
-                if (uiState.status == MediaStatus.COMPLETED) {
+                if (uiState.tracking?.state == TrackingState.COMPLETED) {
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = onRewatch,
@@ -990,13 +1017,21 @@ private fun DetailContentPreview() {
                     ),
                     metadata = MediaMetadata.Video(runtimeMinutes = 139),
                 ),
-                status = MediaStatus.BACKLOG,
                 entryId = 1L,
             ),
             onAddToWatchlist = {},
             onAddToPile = {},
             onManageLists = {},
-            onSetStatus = {},
+            onStartTracking = { _, _, _ -> },
+            onPauseTracking = {},
+            onResumeTracking = {},
+            onCompleteTracking = {},
+            onAbandonTracking = {},
+            onUpdateCounter = { _, _, _ -> },
+            onAddCheckpoint = {},
+            onCheckpointCompleted = { _, _ -> },
+            onAddQuickLog = {},
+            onAddJournalEntry = { _, _ -> },
             onRemoveFromWatchlist = {},
             onMarkAsWatchedClick = {},
             onEditRating = {},

@@ -73,11 +73,14 @@ import com.couchlist.app.core.domain.model.ListGroup
 import com.couchlist.app.core.domain.model.MediaList
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
+import com.couchlist.app.core.ui.components.MediaProgressRing
+import com.couchlist.app.core.ui.components.MediaProgressRingSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListsRoute(
     onListClick: (Long) -> Unit,
+    onItemClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onDashboardClick: () -> Unit,
     onLibraryClick: () -> Unit,
@@ -159,6 +162,7 @@ fun ListsRoute(
         ListsContent(
             state = uiState,
             onListClick = onListClick,
+            onItemClick = onItemClick,
             onEditList = { editingList = it },
             onDeleteList = { deletingList = it },
             onDuplicateList = viewModel::duplicateList,
@@ -279,6 +283,7 @@ fun ListsRoute(
 private fun ListsContent(
     state: ListsUiState,
     onListClick: (Long) -> Unit,
+    onItemClick: (Long) -> Unit,
     onEditList: (MediaList) -> Unit,
     onDeleteList: (MediaList) -> Unit,
     onDuplicateList: (MediaList) -> Unit,
@@ -308,6 +313,11 @@ private fun ListsContent(
         state.pile?.let { pile ->
             item(key = "pile") {
                 PileCard(pile, state.pileItems, onClick = { onListClick(pile.list.id) })
+            }
+        }
+        if (state.enjoyingItems.isNotEmpty()) {
+            item(key = "enjoying") {
+                EnjoyingShelf(state.enjoyingItems, onItemClick)
             }
         }
         if (state.pinnedLists.isNotEmpty()) {
@@ -353,6 +363,71 @@ private fun ListsContent(
                     onSetGroup = onSetGroup,
                     onMoveList = onMoveList,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnjoyingShelf(items: List<LibraryMedia>, onItemClick: (Long) -> Unit) {
+    Column {
+        SectionTitle("Enjoying")
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items, key = { it.library.id }) { item ->
+                Column(
+                    modifier = Modifier
+                        .width(112.dp)
+                        .clickable { onItemClick(item.media.id) },
+                ) {
+                    Card {
+                        Box {
+                            if (item.media.artworkUri != null) {
+                                AsyncImage(
+                                    model = item.media.artworkUri,
+                                    contentDescription = item.media.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(item.media.title.take(1), style = MaterialTheme.typography.headlineMedium)
+                                }
+                            }
+                            item.progress?.let { progress ->
+                                Surface(
+                                    shape = MaterialTheme.shapes.extraLarge,
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                                ) {
+                                    MediaProgressRing(
+                                        progress = progress,
+                                        size = MediaProgressRingSize.COMPACT,
+                                        modifier = Modifier.padding(3.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Text(
+                        item.media.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                    Text(
+                        item.tracking?.mode?.displayName.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

@@ -89,6 +89,7 @@ fun CouchlistNavHost(
             composable<ListsRoute> {
                 ListsScreen(
                     onListClick = { listId -> navController.navigate(ListDetailRoute(listId)) },
+                    onItemClick = { mediaId -> navController.navigate(DetailRoute(mediaId)) },
                     onSearchClick = { navController.navigateTopLevel(SearchRoute) },
                     onDashboardClick = { navController.navigate(HomeRoute) },
                     onLibraryClick = { navController.navigate(LibraryRoute) },

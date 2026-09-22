@@ -516,6 +516,233 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE media_list_joins RENAME TO media_list_joins_v5")
+        db.execSQL("ALTER TABLE library_items RENAME TO library_items_v5")
+
+        db.execSQL("DROP INDEX IF EXISTS index_media_list_joins_list_id")
+        db.execSQL("DROP INDEX IF EXISTS index_media_list_joins_library_item_id")
+        db.execSQL("DROP INDEX IF EXISTS index_media_list_joins_list_id_library_item_id")
+        db.execSQL("DROP INDEX IF EXISTS index_library_items_media_id")
+        db.execSQL("DROP INDEX IF EXISTS index_library_items_status")
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS library_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                media_id INTEGER NOT NULL,
+                personal_rating INTEGER,
+                favorite INTEGER NOT NULL,
+                notes TEXT,
+                added_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (media_id) REFERENCES media_items (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO library_items (
+                id, media_id, personal_rating, favorite, notes, added_at, updated_at
+            )
+            SELECT id, media_id, personal_rating, favorite, notes, added_at, updated_at
+            FROM library_items_v5
+            """.trimIndent(),
+        )
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS tracking_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                library_item_id INTEGER NOT NULL,
+                mode TEXT NOT NULL,
+                state TEXT NOT NULL,
+                current_slot INTEGER,
+                started_at INTEGER NOT NULL,
+                ended_at INTEGER,
+                legacy_progress_fraction REAL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (library_item_id) REFERENCES library_items (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS tracking_counters (
+                session_id INTEGER NOT NULL PRIMARY KEY,
+                current_value REAL NOT NULL,
+                total_value REAL,
+                unit TEXT,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES tracking_sessions (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS tracking_checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                session_id INTEGER NOT NULL,
+                stable_key TEXT NOT NULL,
+                parent_id INTEGER,
+                kind TEXT NOT NULL,
+                origin TEXT NOT NULL,
+                label TEXT NOT NULL,
+                sort_order INTEGER NOT NULL,
+                completed_at INTEGER,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES tracking_sessions (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY (parent_id) REFERENCES tracking_checkpoints (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS tracking_quick_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                session_id INTEGER NOT NULL,
+                occurred_at INTEGER NOT NULL,
+                note TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES tracking_sessions (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS tracking_journal_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                session_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                occurred_at INTEGER NOT NULL,
+                notes TEXT,
+                image_uri TEXT,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES tracking_sessions (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+
+        db.execSQL(
+            """
+            INSERT INTO tracking_sessions (
+                library_item_id, mode, state, current_slot, started_at, ended_at,
+                legacy_progress_fraction, created_at, updated_at
+            )
+            SELECT
+                legacy.id,
+                CASE media.category
+                    WHEN 'MOVIE' THEN 'JUST_ENJOYING'
+                    WHEN 'TV' THEN 'CHECKLIST'
+                    WHEN 'ANIME' THEN 'CHECKLIST'
+                    WHEN 'BOOK' THEN 'SIMPLE_COUNTER'
+                    WHEN 'MANGA' THEN 'SIMPLE_COUNTER'
+                    WHEN 'COMIC' THEN 'SIMPLE_COUNTER'
+                    ELSE 'JUST_ENJOYING'
+                END,
+                CASE legacy.status
+                    WHEN 'WATCHING' THEN 'ACTIVE'
+                    WHEN 'COMPLETED' THEN 'COMPLETED'
+                    WHEN 'ABANDONED' THEN 'ABANDONED'
+                    ELSE 'PAUSED'
+                END,
+                1,
+                COALESCE(legacy.started_at, legacy.added_at),
+                CASE legacy.status
+                    WHEN 'COMPLETED' THEN COALESCE(legacy.completed_at, legacy.updated_at)
+                    WHEN 'ABANDONED' THEN legacy.updated_at
+                    ELSE NULL
+                END,
+                legacy.progress,
+                legacy.added_at,
+                legacy.updated_at
+            FROM library_items_v5 legacy
+            INNER JOIN media_items media ON media.id = legacy.media_id
+            WHERE legacy.status != 'BACKLOG' OR legacy.progress IS NOT NULL
+            """.trimIndent(),
+        )
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS media_list_joins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                list_id INTEGER NOT NULL,
+                library_item_id INTEGER NOT NULL,
+                added_at INTEGER NOT NULL,
+                FOREIGN KEY (list_id) REFERENCES lists (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY (library_item_id) REFERENCES library_items (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO media_list_joins (id, list_id, library_item_id, added_at)
+            SELECT id, list_id, library_item_id, added_at FROM media_list_joins_v5
+            """.trimIndent(),
+        )
+
+        db.execSQL("DROP TABLE media_list_joins_v5")
+        db.execSQL("DROP TABLE library_items_v5")
+
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_library_items_media_id " +
+                "ON library_items (media_id)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_media_list_joins_list_id " +
+                "ON media_list_joins (list_id)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_media_list_joins_library_item_id " +
+                "ON media_list_joins (library_item_id)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_media_list_joins_list_id_library_item_id " +
+                "ON media_list_joins (list_id, library_item_id)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_tracking_sessions_library_item_id_current_slot " +
+                "ON tracking_sessions (library_item_id, current_slot)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_tracking_sessions_state_updated_at " +
+                "ON tracking_sessions (state, updated_at)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_tracking_checkpoints_session_id_stable_key " +
+                "ON tracking_checkpoints (session_id, stable_key)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_tracking_checkpoints_parent_id " +
+                "ON tracking_checkpoints (parent_id)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_tracking_quick_logs_session_id_occurred_at " +
+                "ON tracking_quick_logs (session_id, occurred_at)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_tracking_journal_entries_session_id_occurred_at " +
+                "ON tracking_journal_entries (session_id, occurred_at)",
+        )
+
+        assertNoForeignKeyViolations(db)
+    }
+}
+
 val SEED_DEFAULT_LISTS_CALLBACK = object : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)

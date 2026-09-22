@@ -11,6 +11,9 @@ import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaMetadata
 import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.TrackingMode
+import com.couchlist.app.core.domain.model.TrackingState
+import com.couchlist.app.core.domain.model.TrackingSummary
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -93,15 +96,27 @@ class ListsUiStateTest {
         library = LibraryItem(
             id = id,
             mediaId = id,
-            status = status,
-            progress = null,
             personalRating = null,
             favorite = false,
             notes = null,
             addedAt = 1,
-            startedAt = null,
-            completedAt = null,
             updatedAt = 1,
         ),
+        tracking = when (status) {
+            MediaStatus.BACKLOG -> null
+            MediaStatus.WATCHING -> trackingSummary(id, TrackingState.ACTIVE)
+            MediaStatus.COMPLETED -> trackingSummary(id, TrackingState.COMPLETED)
+            MediaStatus.ABANDONED -> trackingSummary(id, TrackingState.ABANDONED)
+        },
+    )
+
+    private fun trackingSummary(id: Long, state: TrackingState) = TrackingSummary(
+        sessionId = id,
+        mode = TrackingMode.JUST_ENJOYING,
+        state = state,
+        progress = null,
+        startedAt = 1,
+        endedAt = if (state == TrackingState.COMPLETED || state == TrackingState.ABANDONED) 1 else null,
+        updatedAt = 1,
     )
 }

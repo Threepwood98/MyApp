@@ -2,7 +2,6 @@ package com.couchlist.app.core.data.repository
 
 import androidx.room.withTransaction
 import com.couchlist.app.core.data.local.CouchlistDatabase
-import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.local.entity.EpisodeEntity
@@ -24,7 +23,6 @@ import kotlinx.coroutines.flow.map
 class TvRepositoryImpl @Inject constructor(
     private val database: CouchlistDatabase,
     private val mediaItemDao: MediaItemDao,
-    private val libraryItemDao: LibraryItemDao,
     private val tvDao: TvDao,
     private val providerRegistry: MetadataProviderRegistry,
 ) : TvRepository {
@@ -115,10 +113,6 @@ class TvRepositoryImpl @Inject constructor(
                         updatedAt = now,
                     ),
                 )
-                val total = tvDao.getTotalEpisodeCount(episode.mediaId)
-                val watchedCount = tvDao.getWatchedEpisodeCount(episode.mediaId)
-                val progress = total.takeIf { it > 0 }?.let { watchedCount.toDouble() / it }
-                libraryItemDao.updateProgress(episode.mediaId, progress, now)
             }
             Result.success(Unit)
         } catch (e: CancellationException) {

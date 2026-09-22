@@ -5,7 +5,6 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.couchlist.app.core.domain.model.MediaStatus
 
 /**
  * User-specific state for one media item. Exists at most once per media item;
@@ -23,7 +22,6 @@ import com.couchlist.app.core.domain.model.MediaStatus
     ],
     indices = [
         Index(value = ["media_id"], unique = true),
-        Index(value = ["status"]),
     ],
 )
 data class LibraryItemEntity(
@@ -31,18 +29,12 @@ data class LibraryItemEntity(
     val id: Long = 0L,
     @ColumnInfo(name = "media_id")
     val mediaId: Long,
-    val status: MediaStatus,
-    val progress: Double?,
     @ColumnInfo(name = "personal_rating")
     val personalRating: Int?,
     val favorite: Boolean = false,
     val notes: String?,
     @ColumnInfo(name = "added_at")
     val addedAt: Long = System.currentTimeMillis(),
-    @ColumnInfo(name = "started_at")
-    val startedAt: Long?,
-    @ColumnInfo(name = "completed_at")
-    val completedAt: Long?,
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis(),
 )

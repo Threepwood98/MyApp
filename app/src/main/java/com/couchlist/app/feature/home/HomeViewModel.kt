@@ -3,7 +3,7 @@ package com.couchlist.app.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.couchlist.app.core.domain.model.LibraryMedia
-import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.TrackingState
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,16 +25,16 @@ class HomeViewModel @Inject constructor(
             repository.observeLibrary().collect { library ->
                 _uiState.value = HomeUiState(
                     continueWatching = library
-                        .filter { it.library.status == MediaStatus.WATCHING }
-                        .sortedByDescending { it.library.updatedAt }
+                        .filter { it.tracking?.state == TrackingState.ACTIVE }
+                        .sortedByDescending { it.tracking?.updatedAt }
                         .take(DASHBOARD_LIMIT),
                     recentlyAdded = library
                         .sortedByDescending { it.library.addedAt }
                         .take(DASHBOARD_LIMIT),
                     recentlyCompleted = library
-                        .filter { it.library.status == MediaStatus.COMPLETED }
+                        .filter { it.tracking?.state == TrackingState.COMPLETED }
                         .sortedByDescending {
-                            it.library.completedAt ?: it.library.updatedAt
+                            it.tracking?.endedAt ?: it.tracking?.updatedAt
                         }
                         .take(DASHBOARD_LIMIT),
                 )

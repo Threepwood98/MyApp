@@ -4,4 +4,11 @@ package com.couchlist.app.core.domain.model
 data class LibraryMedia(
     val media: MediaItem,
     val library: LibraryItem,
-)
+    val tracking: TrackingSummary? = null,
+) {
+    val status: MediaStatus
+        get() = tracking?.status ?: MediaStatus.BACKLOG
+
+    val progress: Double?
+        get() = tracking?.progress
+}

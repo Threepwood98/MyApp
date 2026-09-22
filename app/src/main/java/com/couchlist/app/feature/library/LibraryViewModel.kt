@@ -2,15 +2,19 @@ package com.couchlist.app.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.LibraryRemoval
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.SmartFilter
+import com.couchlist.app.core.domain.model.TrackingState
+import com.couchlist.app.core.domain.model.TrackingSummary
+import com.couchlist.app.core.domain.model.defaultTrackingMode
+import com.couchlist.app.core.domain.model.defaultTrackingUnit
 import com.couchlist.app.core.domain.model.nextStatus
 import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.TrackingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -26,6 +30,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val repository: LibraryRepository,
+    private val trackingRepository: TrackingRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -80,13 +85,16 @@ class LibraryViewModel @Inject constructor(
             val count = state.selectedIds.size
             state.selectedIds.forEach { mediaId ->
                 val item = state.items.firstOrNull { it.media.id == mediaId } ?: return@forEach
-                repository.moveItem(item.library.id, targetStatus)
+                moveToStatus(item, targetStatus)
             }
             _uiState.update { it.copy(isMultiSelectMode = false, selectedIds = emptySet()) }
             _events.send(
                 LibraryEvent.ShowUndo(
                     message = "Moved $count titles to ${targetStatus.displayName}",
-                    action = LibraryUndo.BatchStatus(state.items.filter { it.media.id in state.selectedIds }.map { it.library }),
+                    action = LibraryUndo.BatchStatus(
+                        state.items.filter { it.media.id in state.selectedIds }
+                            .map { TrackingSnapshot(it.library.id, it.tracking) },
+                    ),
                 ),
             )
         }
@@ -112,13 +120,13 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onAdvanceStatus(item: LibraryMedia) {
-        val next = item.library.status.nextStatus ?: return
+        val next = item.status.nextStatus ?: return
         viewModelScope.launch {
-            repository.moveItem(item.library.id, next)
+            moveToStatus(item, next)
             _events.send(
                 LibraryEvent.ShowUndo(
                     message = "Moved ${item.media.title} to ${next.displayName}",
-                    action = LibraryUndo.Status(item.library),
+                    action = LibraryUndo.Status(TrackingSnapshot(item.library.id, item.tracking)),
                 ),
             )
         }
@@ -139,9 +147,14 @@ class LibraryViewModel @Inject constructor(
     fun onUndo(action: LibraryUndo) {
         viewModelScope.launch {
             when (action) {
-                is LibraryUndo.Status -> repository.restoreItemState(action.previous)
+                is LibraryUndo.Status -> trackingRepository.restoreCurrent(
+                    action.previous.libraryItemId,
+                    action.previous.tracking,
+                )
                 is LibraryUndo.Removal -> repository.restoreRemoval(action.removal)
-                is LibraryUndo.BatchStatus -> action.previous.forEach { repository.restoreItemState(it) }
+                is LibraryUndo.BatchStatus -> action.previous.forEach {
+                    trackingRepository.restoreCurrent(it.libraryItemId, it.tracking)
+                }
                 is LibraryUndo.BatchRemoval -> action.removals.forEach { repository.restoreRemoval(it) }
             }
         }
@@ -192,6 +205,46 @@ class LibraryViewModel @Inject constructor(
         val state = _uiState.value
         return state.sortedItems
     }
+
+    private suspend fun moveToStatus(item: LibraryMedia, status: MediaStatus) {
+        when (status) {
+            MediaStatus.BACKLOG -> {
+                if (item.tracking?.state == TrackingState.ACTIVE) {
+                    trackingRepository.pause(item.library.id)
+                }
+            }
+            MediaStatus.WATCHING -> when (item.tracking?.state) {
+                TrackingState.PAUSED -> trackingRepository.resume(item.library.id)
+                TrackingState.ACTIVE -> Unit
+                TrackingState.COMPLETED, TrackingState.ABANDONED, null ->
+                    trackingRepository.start(
+                        mediaId = item.media.id,
+                        mode = item.media.category.defaultTrackingMode,
+                        counterUnit = item.media.category.defaultTrackingUnit,
+                    )
+            }
+            MediaStatus.COMPLETED -> {
+                if (item.tracking?.state !in setOf(TrackingState.ACTIVE, TrackingState.PAUSED)) {
+                    trackingRepository.start(
+                        mediaId = item.media.id,
+                        mode = item.media.category.defaultTrackingMode,
+                        counterUnit = item.media.category.defaultTrackingUnit,
+                    )
+                }
+                trackingRepository.complete(item.library.id)
+            }
+            MediaStatus.ABANDONED -> {
+                if (item.tracking?.state !in setOf(TrackingState.ACTIVE, TrackingState.PAUSED)) {
+                    trackingRepository.start(
+                        mediaId = item.media.id,
+                        mode = item.media.category.defaultTrackingMode,
+                        counterUnit = item.media.category.defaultTrackingUnit,
+                    )
+                }
+                trackingRepository.abandon(item.library.id)
+            }
+        }
+    }
 }
 
 data class LibraryUiState(
@@ -226,7 +279,7 @@ data class LibraryUiState(
         }
 
     val statusItems: List<LibraryMedia>
-        get() = sortedItems.filter { it.library.status == currentStatusTab }
+        get() = sortedItems.filter { it.status == currentStatusTab }
 }
 
 enum class SortOption(val displayName: String) {
@@ -236,11 +289,16 @@ enum class SortOption(val displayName: String) {
 }
 
 sealed interface LibraryUndo {
-    data class Status(val previous: LibraryItem) : LibraryUndo
+    data class Status(val previous: TrackingSnapshot) : LibraryUndo
     data class Removal(val removal: LibraryRemoval) : LibraryUndo
-    data class BatchStatus(val previous: List<LibraryItem>) : LibraryUndo
+    data class BatchStatus(val previous: List<TrackingSnapshot>) : LibraryUndo
     data class BatchRemoval(val removals: List<LibraryRemoval>) : LibraryUndo
 }
+
+data class TrackingSnapshot(
+    val libraryItemId: Long,
+    val tracking: TrackingSummary?,
+)
 
 sealed interface LibraryEvent {
     data class ShowUndo(

@@ -20,7 +20,7 @@ data class SmartFilter(
 ) {
     fun matches(item: LibraryMedia): Boolean {
         statuses?.let { statuses ->
-            if (item.library.status !in statuses) return false
+            if (item.status !in statuses) return false
         }
         minRating?.let { min ->
             val rating = item.library.personalRating ?: return false

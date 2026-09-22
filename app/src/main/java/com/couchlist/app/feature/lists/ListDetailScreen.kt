@@ -54,6 +54,9 @@ import coil3.compose.AsyncImage
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
+import com.couchlist.app.core.domain.model.TrackingState
+import com.couchlist.app.core.ui.components.MediaProgressRing
+import com.couchlist.app.core.ui.components.MediaProgressRingSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +119,11 @@ fun ListDetailRoute(
             onRemove = { viewModel.remove(item); selectedItem = null },
             onCopy = { targetId -> viewModel.copy(item, targetId); selectedItem = null },
             onMove = { targetId -> viewModel.move(item, targetId); selectedItem = null },
+            onStartTracking = { viewModel.startTracking(item); selectedItem = null },
+            onPauseTracking = { viewModel.pauseTracking(item); selectedItem = null },
+            onResumeTracking = { viewModel.resumeTracking(item); selectedItem = null },
+            onCompleteTracking = { viewModel.completeTracking(item); selectedItem = null },
+            onAbandonTracking = { viewModel.abandonTracking(item); selectedItem = null },
         )
     }
 }
@@ -207,6 +215,13 @@ private fun ListMediaCard(
                         Icon(Icons.Filled.MoreVert, contentDescription = "Actions for ${item.media.title}")
                     }
                 }
+                item.progress?.let { progress ->
+                    MediaProgressRing(
+                        progress = progress,
+                        size = MediaProgressRingSize.COMPACT,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                    )
+                }
             }
         }
         Text(
@@ -217,7 +232,7 @@ private fun ListMediaCard(
             modifier = Modifier.padding(top = 6.dp),
         )
         Text(
-            item.library.status.displayName,
+            item.status.displayName,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -234,11 +249,49 @@ private fun ItemActionsSheet(
     onRemove: () -> Unit,
     onCopy: (Long) -> Unit,
     onMove: (Long) -> Unit,
+    onStartTracking: () -> Unit,
+    onPauseTracking: () -> Unit,
+    onResumeTracking: () -> Unit,
+    onCompleteTracking: () -> Unit,
+    onAbandonTracking: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(item.media.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp))
         TextButton(onClick = onRemove, modifier = Modifier.padding(horizontal = 12.dp)) {
             Text(if (sourceType == MediaListType.PILE) "Remove from The Pile" else "Remove from list")
+        }
+        Text(
+            "Tracking",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        when (item.tracking?.state) {
+            null, TrackingState.COMPLETED, TrackingState.ABANDONED ->
+                TextButton(onClick = onStartTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text(if (item.tracking == null) "Start tracking" else "Start again")
+                }
+            TrackingState.ACTIVE -> {
+                TextButton(onClick = onPauseTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Pause")
+                }
+                TextButton(onClick = onCompleteTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Complete")
+                }
+                TextButton(onClick = onAbandonTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Abandon")
+                }
+            }
+            TrackingState.PAUSED -> {
+                TextButton(onClick = onResumeTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Resume")
+                }
+                TextButton(onClick = onCompleteTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Complete")
+                }
+                TextButton(onClick = onAbandonTracking, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Text("Abandon")
+                }
+            }
         }
         if (targets.isNotEmpty()) {
             Text(

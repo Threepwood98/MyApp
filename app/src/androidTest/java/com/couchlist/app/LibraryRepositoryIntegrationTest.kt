@@ -6,8 +6,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.repository.LibraryRepositoryImpl
+import com.couchlist.app.core.data.repository.TrackingRepositoryImpl
 import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaListType
+import com.couchlist.app.core.domain.model.TrackingMode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -24,6 +26,7 @@ class LibraryRepositoryIntegrationTest {
 
     private lateinit var database: CouchlistDatabase
     private lateinit var repository: LibraryRepositoryImpl
+    private lateinit var trackingRepository: TrackingRepositoryImpl
 
     @Before
     fun setUp() {
@@ -35,6 +38,12 @@ class LibraryRepositoryIntegrationTest {
             database = database,
             libraryItemDao = database.libraryItemDao(),
             mediaListDao = database.mediaListDao(),
+            trackingDao = database.trackingDao(),
+        )
+        trackingRepository = TrackingRepositoryImpl(
+            database = database,
+            libraryItemDao = database.libraryItemDao(),
+            trackingDao = database.trackingDao(),
         )
     }
 
@@ -115,6 +124,25 @@ class LibraryRepositoryIntegrationTest {
         repository.removeFromList(targetId, libraryItemId)
         assertTrue(repository.observeListItems(targetId).first().isEmpty())
         assertNotNull(repository.observeEntry(mediaId).first())
+    }
+
+    @Test
+    fun removalUndoRestoresMembershipsAndTracking() = runBlocking {
+        val mediaId = insertMedia("undo")
+        val listId = repository.createList("Queue", null, MediaListType.TODO)
+        val libraryItemId = repository.addToList(listId, mediaId)
+        trackingRepository.start(mediaId, TrackingMode.SIMPLE_COUNTER, 20.0, "chapters")
+        trackingRepository.updateCounter(libraryItemId, 7.0, 20.0, "chapters")
+
+        val removal = checkNotNull(repository.removeItem(libraryItemId))
+        assertNull(repository.observeEntry(mediaId).first())
+        assertNull(trackingRepository.observeCurrent(libraryItemId).first())
+
+        repository.restoreRemoval(removal)
+
+        assertNotNull(repository.observeEntry(mediaId).first())
+        assertEquals(1, repository.observeListItems(listId).first().size)
+        assertEquals(0.35, trackingRepository.observeCurrent(libraryItemId).first()?.progress ?: 0.0, 0.0)
     }
 
     private suspend fun insertMedia(externalId: String): Long =

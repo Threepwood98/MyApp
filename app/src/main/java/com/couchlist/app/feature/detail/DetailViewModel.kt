@@ -7,7 +7,11 @@ import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaDetail
 import com.couchlist.app.core.domain.model.MediaItem
 import com.couchlist.app.core.domain.model.MediaListSummary
-import com.couchlist.app.core.domain.model.MediaStatus
+import com.couchlist.app.core.domain.model.TrackingMode
+import com.couchlist.app.core.domain.model.TrackingSession
+import com.couchlist.app.core.domain.model.TrackingState
+import com.couchlist.app.core.domain.model.defaultTrackingMode
+import com.couchlist.app.core.domain.model.defaultTrackingUnit
 import com.couchlist.app.core.domain.model.TvEpisode
 import com.couchlist.app.core.domain.model.TvProgress
 import com.couchlist.app.core.domain.model.TvSeason
@@ -16,6 +20,7 @@ import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
 import com.couchlist.app.core.domain.repository.LogbookRepository
 import com.couchlist.app.core.domain.repository.TvRepository
+import com.couchlist.app.core.domain.repository.TrackingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -40,6 +45,7 @@ class DetailViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val logbookRepository: LogbookRepository,
     private val tvRepository: TvRepository,
+    private val trackingRepository: TrackingRepository,
 ) : ViewModel() {
 
     private val mediaId: Long = savedStateHandle.get<Long>("mediaId") ?: -1L
@@ -66,6 +72,7 @@ class DetailViewModel @Inject constructor(
             observeEpisodes()
             observeProgress()
             observeNextUnwatched()
+            observeTracking()
             refresh()
         }
     }
@@ -114,7 +121,7 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val state = _uiState.value
             val detail = state.detail ?: return@launch
-            if (state.status != null) {
+            if (state.entryId != null) {
                 _events.send(DetailEvent.ShowMessage("${detail.title} is already in your Watchlist"))
                 return@launch
             }
@@ -141,13 +148,64 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    fun onSetStatus(status: MediaStatus) {
+    fun onStartTracking(mode: TrackingMode, total: Double? = null, unit: String? = null) {
         viewModelScope.launch {
             val state = _uiState.value
             state.detail ?: return@launch
-            val entryId = state.entryId ?: libraryRepository.addToWatchlist(mediaId)
-            libraryRepository.moveItem(entryId, status)
-            _events.send(DetailEvent.ShowMessage("Moved to ${status.displayName}"))
+            trackingRepository.start(mediaId, mode, total, unit)
+            _events.send(DetailEvent.ShowMessage("Started ${mode.displayName.lowercase()}"))
+        }
+    }
+
+    fun onStartDefaultTracking() {
+        val detail = _uiState.value.detail ?: return
+        onStartTracking(
+            mode = detail.category.defaultTrackingMode,
+            unit = detail.category.defaultTrackingUnit,
+        )
+    }
+
+    fun onPauseTracking() {
+        mutateTracking("Tracking paused") { trackingRepository.pause(it) }
+    }
+
+    fun onResumeTracking() {
+        mutateTracking("Tracking resumed") { trackingRepository.resume(it) }
+    }
+
+    fun onCompleteTracking() {
+        mutateTracking("Marked complete") { trackingRepository.complete(it) }
+    }
+
+    fun onAbandonTracking() {
+        mutateTracking("Marked abandoned") { trackingRepository.abandon(it) }
+    }
+
+    fun onUpdateCounter(current: Double, total: Double?, unit: String?) {
+        mutateTracking("Progress updated") {
+            trackingRepository.updateCounter(it, current, total, unit)
+        }
+    }
+
+    fun onAddCheckpoint(label: String) {
+        mutateTracking("Checkpoint added") {
+            trackingRepository.addCheckpoint(it, label)
+        }
+    }
+
+    fun onCheckpointCompleted(checkpointId: Long, completed: Boolean) {
+        viewModelScope.launch {
+            trackingRepository.setCheckpointCompleted(checkpointId, completed)
+        }
+    }
+
+    fun onAddQuickLog(note: String?) {
+        mutateTracking("Session logged") { trackingRepository.addQuickLog(it, note) }
+    }
+
+    fun onAddJournalEntry(title: String, notes: String?) {
+        mutateTracking("Journal entry added") {
+            trackingRepository.addJournalEntry(it, title, notes)
         }
     }
 
@@ -171,8 +229,17 @@ class DetailViewModel @Inject constructor(
                 notes = notes,
             )
             val state = _uiState.value
-            val entryId = state.entryId ?: libraryRepository.addToWatchlist(mediaId)
-            libraryRepository.moveItem(entryId, MediaStatus.COMPLETED)
+            val tracking = state.tracking
+            val libraryItemId = if (
+                tracking == null ||
+                tracking.state == TrackingState.COMPLETED ||
+                tracking.state == TrackingState.ABANDONED
+            ) {
+                trackingRepository.start(mediaId, detail.category.defaultTrackingMode)
+            } else {
+                tracking.libraryItemId
+            }
+            trackingRepository.complete(libraryItemId)
             _events.send(DetailEvent.ShowMessage("Logged ${detail.title} as watched"))
         }
     }
@@ -227,7 +294,6 @@ class DetailViewModel @Inject constructor(
                         state.copy(
                             detail = media?.toDetail(currentProviders),
                             entryId = entry?.id,
-                            status = entry?.status,
                             favorite = entry?.favorite ?: false,
                             personalRating = entry?.personalRating,
                             notes = entry?.notes,
@@ -309,6 +375,23 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    private fun observeTracking() {
+        viewModelScope.launch {
+            trackingRepository.observeCurrentByMediaId(mediaId).collect { tracking ->
+                _uiState.update { it.copy(tracking = tracking) }
+            }
+        }
+    }
+
+    private fun mutateTracking(message: String, mutation: suspend (Long) -> Unit) {
+        val state = _uiState.value
+        val libraryItemId = state.tracking?.libraryItemId ?: state.entryId ?: return
+        viewModelScope.launch {
+            mutation(libraryItemId)
+            _events.send(DetailEvent.ShowMessage(message))
+        }
+    }
+
     private fun refresh() {
         if (mediaId < 0L) return
         viewModelScope.launch {
@@ -368,7 +451,7 @@ class DetailViewModel @Inject constructor(
 data class DetailUiState(
     val detail: MediaDetail? = null,
     val entryId: Long? = null,
-    val status: MediaStatus? = null,
+    val tracking: TrackingSession? = null,
     val favorite: Boolean = false,
     val personalRating: Int? = null,
     val notes: String? = null,

@@ -8,6 +8,7 @@ import com.couchlist.app.core.domain.model.MediaList
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.repository.LibraryRepository
+import com.couchlist.app.core.domain.repository.TrackingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class ListsViewModel @Inject constructor(
     private val repository: LibraryRepository,
+    trackingRepository: TrackingRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListsUiState())
@@ -41,7 +43,15 @@ class ListsViewModel @Inject constructor(
         val lists = repository.observeLists()
         viewModelScope.launch {
             combine(lists, repository.observeGroups(), ::buildListsUiState)
-                .collect { state -> _uiState.update { state.copy(pileItems = it.pileItems, isLoading = false) } }
+                .collect { state ->
+                    _uiState.update {
+                        state.copy(
+                            pileItems = it.pileItems,
+                            enjoyingItems = it.enjoyingItems,
+                            isLoading = false,
+                        )
+                    }
+                }
         }
         viewModelScope.launch {
             lists
@@ -51,6 +61,11 @@ class ListsViewModel @Inject constructor(
                     if (pileId == null) flowOf(emptyList()) else repository.observeListItems(pileId)
                 }
                 .collect { items -> _uiState.update { it.copy(pileItems = items) } }
+        }
+        viewModelScope.launch {
+            trackingRepository.observeEnjoying().collect { items ->
+                _uiState.update { it.copy(enjoyingItems = items) }
+            }
         }
     }
 
@@ -173,6 +188,7 @@ internal fun buildListsUiState(
 data class ListsUiState(
     val pile: MediaListSummary? = null,
     val pileItems: List<LibraryMedia> = emptyList(),
+    val enjoyingItems: List<LibraryMedia> = emptyList(),
     val pinnedLists: List<MediaListSummary> = emptyList(),
     val groups: List<ListGroupSection> = emptyList(),
     val ungroupedLists: List<MediaListSummary> = emptyList(),

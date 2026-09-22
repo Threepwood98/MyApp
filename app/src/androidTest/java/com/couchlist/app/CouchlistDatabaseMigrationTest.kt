@@ -133,7 +133,7 @@ class CouchlistDatabaseMigrationTest {
     }
 
     @Test
-    fun migrate1To3To4To5() {
+    fun migrate1To3To4To5To6() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         context.deleteDatabase(TEST_DB_NAME)
         val versionOneHelper = FrameworkSQLiteOpenHelperFactory().create(
@@ -203,6 +203,13 @@ class CouchlistDatabaseMigrationTest {
             com.couchlist.app.core.data.local.MIGRATION_4_5,
         )
 
+        db = helper.runMigrationsAndValidate(
+            TEST_DB_NAME,
+            6,
+            true,
+            com.couchlist.app.core.data.local.MIGRATION_5_6,
+        )
+
         val cursor = db.query("SELECT source, category, external_id, title FROM media_items")
         assertTrue(cursor.moveToFirst())
         assertEquals("tmdb", cursor.getString(cursor.getColumnIndexOrThrow("source")))
@@ -214,6 +221,104 @@ class CouchlistDatabaseMigrationTest {
             assertTrue(pileCursor.moveToFirst())
             assertEquals(1, pileCursor.getInt(0))
         }
+        db.query("SELECT mode, state FROM tracking_sessions").use { trackingCursor ->
+            assertTrue(trackingCursor.moveToFirst())
+            assertEquals("JUST_ENJOYING", trackingCursor.getString(0))
+            assertEquals("COMPLETED", trackingCursor.getString(1))
+        }
+    }
+
+    @Test
+    fun migrate5To6BackfillsTrackingAndPreservesMemberships() {
+        var db = helper.createDatabase(TEST_DB_NAME, 5).apply {
+            insertV4Media(1, "MOVIE", "101", "Backlog movie")
+            insertV4Media(2, "TV", "202", "Active show")
+            insertV4Media(3, "BOOK", "303", "Paused book")
+            insertV4Media(4, "MOVIE", "404", "Completed movie")
+            insertV4Media(5, "VIDEO_GAME", "505", "Abandoned game")
+            execSQL(
+                """
+                INSERT INTO library_items (
+                    id, media_id, status, progress, personal_rating, favorite, notes,
+                    added_at, started_at, completed_at, updated_at
+                ) VALUES
+                    (10, 1, 'BACKLOG', NULL, NULL, 0, NULL, 100, NULL, NULL, 110),
+                    (11, 2, 'WATCHING', 0.25, 8, 1, 'note', 200, 210, NULL, 220),
+                    (12, 3, 'BACKLOG', 0.5, NULL, 0, NULL, 300, NULL, NULL, 320),
+                    (13, 4, 'COMPLETED', 1.0, NULL, 0, NULL, 400, 410, 450, 460),
+                    (14, 5, 'ABANDONED', NULL, NULL, 0, NULL, 500, 510, NULL, 560)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO lists (
+                    id, name, description, type, group_id, cover_media_id, is_pinned,
+                    sort_order, smart_filter_json, created_at, updated_at
+                ) VALUES (20, 'Queue', NULL, 'TODO', NULL, NULL, 0, 0, NULL, 100, 100)
+                """.trimIndent(),
+            )
+            execSQL(
+                "INSERT INTO media_list_joins (id, list_id, library_item_id, added_at) " +
+                    "VALUES (30, 20, 11, 230)",
+            )
+            close()
+        }
+
+        db = helper.runMigrationsAndValidate(
+            TEST_DB_NAME,
+            6,
+            true,
+            com.couchlist.app.core.data.local.MIGRATION_5_6,
+        )
+
+        db.query("PRAGMA table_info(library_items)").use { cursor ->
+            val columns = mutableSetOf<String>()
+            while (cursor.moveToNext()) columns += cursor.getString(cursor.getColumnIndexOrThrow("name"))
+            assertFalse("status" in columns)
+            assertFalse("progress" in columns)
+            assertFalse("started_at" in columns)
+            assertFalse("completed_at" in columns)
+            assertTrue("personal_rating" in columns)
+        }
+        db.query("SELECT COUNT(*) FROM tracking_sessions").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(4, cursor.getInt(0))
+        }
+        db.query(
+            "SELECT mode, state, started_at, legacy_progress_fraction " +
+                "FROM tracking_sessions WHERE library_item_id = 11",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("CHECKLIST", cursor.getString(0))
+            assertEquals("ACTIVE", cursor.getString(1))
+            assertEquals(210L, cursor.getLong(2))
+            assertEquals(0.25, cursor.getDouble(3), 0.0)
+        }
+        db.query(
+            "SELECT mode, state, legacy_progress_fraction " +
+                "FROM tracking_sessions WHERE library_item_id = 12",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("SIMPLE_COUNTER", cursor.getString(0))
+            assertEquals("PAUSED", cursor.getString(1))
+            assertEquals(0.5, cursor.getDouble(2), 0.0)
+        }
+        db.query("SELECT state, ended_at FROM tracking_sessions WHERE library_item_id = 13").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("COMPLETED", cursor.getString(0))
+            assertEquals(450L, cursor.getLong(1))
+        }
+        db.query("SELECT state, ended_at FROM tracking_sessions WHERE library_item_id = 14").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("ABANDONED", cursor.getString(0))
+            assertEquals(560L, cursor.getLong(1))
+        }
+        db.query("SELECT library_item_id, added_at FROM media_list_joins WHERE id = 30").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(11L, cursor.getLong(0))
+            assertEquals(230L, cursor.getLong(1))
+        }
+        db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
     }
 
     @Test
@@ -330,5 +435,9 @@ class CouchlistDatabaseMigrationTest {
 
     private fun assertEquals(expected: Any?, actual: Any?) {
         org.junit.Assert.assertEquals(expected, actual)
+    }
+
+    private fun assertEquals(expected: Double, actual: Double, delta: Double) {
+        org.junit.Assert.assertEquals(expected, actual, delta)
     }
 }

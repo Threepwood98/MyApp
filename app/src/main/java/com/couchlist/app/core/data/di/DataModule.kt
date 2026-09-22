@@ -9,12 +9,14 @@ import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.MIGRATION_1_3
 import com.couchlist.app.core.data.local.MIGRATION_3_4
 import com.couchlist.app.core.data.local.MIGRATION_4_5
+import com.couchlist.app.core.data.local.MIGRATION_5_6
 import com.couchlist.app.core.data.local.SEED_DEFAULT_LISTS_CALLBACK
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.LogEntryDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
+import com.couchlist.app.core.data.local.dao.TrackingDao
 import com.couchlist.app.core.data.remote.provider.MetadataProviderRegistry
 import com.couchlist.app.core.data.repository.CatalogRepositoryImpl
 import com.couchlist.app.core.data.repository.ExportImportRepositoryImpl
@@ -23,6 +25,7 @@ import com.couchlist.app.core.data.repository.LogbookRepositoryImpl
 import com.couchlist.app.core.data.repository.PreferencesSettingsRepository
 import com.couchlist.app.core.data.repository.StatisticsRepositoryImpl
 import com.couchlist.app.core.data.repository.TvRepositoryImpl
+import com.couchlist.app.core.data.repository.TrackingRepositoryImpl
 import com.couchlist.app.core.domain.repository.CatalogRepository
 import com.couchlist.app.core.domain.repository.ExportImportRepository
 import com.couchlist.app.core.domain.repository.LibraryRepository
@@ -30,6 +33,7 @@ import com.couchlist.app.core.domain.repository.LogbookRepository
 import com.couchlist.app.core.domain.repository.SettingsRepository
 import com.couchlist.app.core.domain.repository.StatisticsRepository
 import com.couchlist.app.core.domain.repository.TvRepository
+import com.couchlist.app.core.domain.repository.TrackingRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -61,7 +65,7 @@ object DataModule {
             CouchlistDatabase::class.java,
             "couchlist.db",
         )
-            .addMigrations(MIGRATION_1_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .addCallback(SEED_DEFAULT_LISTS_CALLBACK)
             .build()
 
@@ -84,6 +88,10 @@ object DataModule {
 
     @Provides
     @Singleton
+    fun provideTrackingDao(database: CouchlistDatabase): TrackingDao = database.trackingDao()
+
+    @Provides
+    @Singleton
     fun provideLogEntryDao(database: CouchlistDatabase): LogEntryDao = database.logEntryDao()
 
     @Provides
@@ -92,7 +100,16 @@ object DataModule {
         database: CouchlistDatabase,
         libraryItemDao: LibraryItemDao,
         mediaListDao: MediaListDao,
-    ): LibraryRepository = LibraryRepositoryImpl(database, libraryItemDao, mediaListDao)
+        trackingDao: TrackingDao,
+    ): LibraryRepository = LibraryRepositoryImpl(database, libraryItemDao, mediaListDao, trackingDao)
+
+    @Provides
+    @Singleton
+    fun provideTrackingRepository(
+        database: CouchlistDatabase,
+        libraryItemDao: LibraryItemDao,
+        trackingDao: TrackingDao,
+    ): TrackingRepository = TrackingRepositoryImpl(database, libraryItemDao, trackingDao)
 
     @Provides
     @Singleton
@@ -108,13 +125,11 @@ object DataModule {
     fun provideTvRepository(
         database: CouchlistDatabase,
         mediaItemDao: MediaItemDao,
-        libraryItemDao: LibraryItemDao,
         tvDao: TvDao,
         providerRegistry: MetadataProviderRegistry,
     ): TvRepository = TvRepositoryImpl(
         database,
         mediaItemDao,
-        libraryItemDao,
         tvDao,
         providerRegistry,
     )
@@ -140,11 +155,13 @@ object DataModule {
         libraryItemDao: LibraryItemDao,
         mediaListDao: MediaListDao,
         logEntryDao: LogEntryDao,
+        trackingDao: TrackingDao,
     ): ExportImportRepository = ExportImportRepositoryImpl(
         database,
         mediaItemDao,
         libraryItemDao,
         mediaListDao,
         logEntryDao,
+        trackingDao,
     )
 }

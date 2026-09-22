@@ -89,6 +89,8 @@ import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.SmartFilter
 import com.couchlist.app.core.domain.model.nextStatus
+import com.couchlist.app.core.ui.components.MediaProgressRing
+import com.couchlist.app.core.ui.components.MediaProgressRingSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -554,7 +556,7 @@ private fun SwipeableLibraryRow(
     val dismissState = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = item.library.status.nextStatus != null,
+        enableDismissFromStartToEnd = item.status.nextStatus != null,
         onDismiss = { direction ->
             when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> onAdvance(item)
@@ -664,6 +666,12 @@ private fun LibraryMediaRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        item.progress?.let { progress ->
+            MediaProgressRing(
+                progress = progress,
+                size = MediaProgressRingSize.COMPACT,
+            )
+        }
     }
 }
 
@@ -722,11 +730,17 @@ private fun SelectableLibraryRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${item.media.category.name} \u00B7 ${item.library.status.displayName}",
+                text = "${item.media.category.name} \u00B7 ${item.status.displayName}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+        item.progress?.let { progress ->
+            MediaProgressRing(
+                progress = progress,
+                size = MediaProgressRingSize.COMPACT,
             )
         }
     }

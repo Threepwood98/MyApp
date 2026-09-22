@@ -7,14 +7,10 @@ package com.couchlist.app.core.domain.model
 data class LibraryItem(
     val id: Long,
     val mediaId: Long,
-    val status: MediaStatus,
-    val progress: Double?,
     val personalRating: Int?,
     val favorite: Boolean,
     val notes: String?,
     val addedAt: Long,
-    val startedAt: Long?,
-    val completedAt: Long?,
     val updatedAt: Long,
 ) {
     init {
@@ -30,4 +26,5 @@ data class ListMembership(
 data class LibraryRemoval(
     val item: LibraryItem,
     val memberships: List<ListMembership>,
+    val trackingSessions: List<TrackingSession> = emptyList(),
 )

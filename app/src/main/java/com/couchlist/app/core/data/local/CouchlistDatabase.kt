@@ -7,6 +7,7 @@ import com.couchlist.app.core.data.local.dao.LogEntryDao
 import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
+import com.couchlist.app.core.data.local.dao.TrackingDao
 import com.couchlist.app.core.data.local.entity.EpisodeEntity
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
 import com.couchlist.app.core.data.local.entity.ListGroupEntity
@@ -15,6 +16,11 @@ import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.local.entity.MediaListEntity
 import com.couchlist.app.core.data.local.entity.MediaListJoinEntity
 import com.couchlist.app.core.data.local.entity.SeasonEntity
+import com.couchlist.app.core.data.local.entity.TrackingCheckpointEntity
+import com.couchlist.app.core.data.local.entity.TrackingCounterEntity
+import com.couchlist.app.core.data.local.entity.TrackingJournalEntryEntity
+import com.couchlist.app.core.data.local.entity.TrackingQuickLogEntity
+import com.couchlist.app.core.data.local.entity.TrackingSessionEntity
 import com.couchlist.app.core.data.local.entity.VideoMetadataEntity
 import com.couchlist.app.core.data.local.entity.WatchProviderCacheEntity
 
@@ -30,8 +36,13 @@ import com.couchlist.app.core.data.local.entity.WatchProviderCacheEntity
         EpisodeEntity::class,
         LogEntryEntity::class,
         WatchProviderCacheEntity::class,
+        TrackingSessionEntity::class,
+        TrackingCounterEntity::class,
+        TrackingCheckpointEntity::class,
+        TrackingQuickLogEntity::class,
+        TrackingJournalEntryEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class CouchlistDatabase : RoomDatabase() {
@@ -44,4 +55,6 @@ abstract class CouchlistDatabase : RoomDatabase() {
     abstract fun logEntryDao(): LogEntryDao
 
     abstract fun tvDao(): TvDao
+
+    abstract fun trackingDao(): TrackingDao
 }
