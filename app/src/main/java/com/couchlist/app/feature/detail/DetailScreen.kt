@@ -37,7 +37,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -70,6 +72,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaDetail
+import com.couchlist.app.core.domain.model.MediaListSummary
+import com.couchlist.app.core.domain.model.MediaListType
 import com.couchlist.app.core.domain.model.MediaMetadata
 import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaStatus
@@ -92,6 +96,7 @@ fun DetailRoute(
     var showRatingDialog by remember { mutableStateOf(false) }
     var showEditRatingDialog by remember { mutableStateOf(false) }
     var showEditNotesDialog by remember { mutableStateOf(false) }
+    var showListSheet by remember { mutableStateOf(false) }
 
     if (showRatingDialog) {
         RatingNotesDialog(
@@ -182,6 +187,8 @@ fun DetailRoute(
                 uiState.detail != null -> DetailContent(
                     uiState = uiState,
                     onAddToWatchlist = viewModel::onAddToWatchlist,
+                    onAddToPile = viewModel::onAddToPile,
+                    onManageLists = { showListSheet = true },
                     onSetStatus = viewModel::onSetStatus,
                     onRemoveFromWatchlist = viewModel::onRemoveFromWatchlist,
                     onMarkAsWatchedClick = { showRatingDialog = true },
@@ -201,12 +208,23 @@ fun DetailRoute(
             }
         }
     }
+
+    if (showListSheet) {
+        ListMembershipSheet(
+            lists = uiState.lists,
+            memberships = uiState.listMembershipIds,
+            onToggle = viewModel::onListMembershipChange,
+            onDismiss = { showListSheet = false },
+        )
+    }
 }
 
 @Composable
 private fun DetailContent(
     uiState: DetailUiState,
     onAddToWatchlist: () -> Unit,
+    onAddToPile: () -> Unit,
+    onManageLists: () -> Unit,
     onSetStatus: (MediaStatus) -> Unit,
     onRemoveFromWatchlist: () -> Unit,
     onMarkAsWatchedClick: () -> Unit,
@@ -299,19 +317,23 @@ private fun DetailContent(
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = if (uiState.status == null) "Add to your lists" else "Status",
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Text(text = "Library", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             if (uiState.status == null) {
                 Button(
-                    onClick = onAddToWatchlist,
+                    onClick = onAddToPile,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = "Add to Watchlist")
+                    Text(text = "Add to The Pile")
+                }
+                OutlinedButton(onClick = onManageLists, modifier = Modifier.fillMaxWidth()) {
+                    Text(text = "Choose a list")
                 }
             } else {
+                OutlinedButton(onClick = onManageLists, modifier = Modifier.fillMaxWidth()) {
+                    Text(text = "Manage lists")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(MediaStatus.entries) { status ->
                         FilterChip(
@@ -322,7 +344,7 @@ private fun DetailContent(
                     }
                 }
                 TextButton(onClick = onRemoveFromWatchlist) {
-                    Text(text = "Remove from lists")
+                    Text(text = "Remove from Library")
                 }
             }
             if (detail.category == MediaCategory.MOVIE) {
@@ -374,6 +396,37 @@ private fun DetailContent(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListMembershipSheet(
+    lists: List<MediaListSummary>,
+    memberships: Set<Long>,
+    onToggle: (Long, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "Add to lists",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        lists.filter { it.list.type != MediaListType.SMART_LIST }.forEach { summary ->
+            val selected = summary.list.id in memberships
+            ListItem(
+                headlineContent = { Text(summary.list.name) },
+                supportingContent = { Text("${summary.itemCount} items") },
+                trailingContent = { Checkbox(checked = selected, onCheckedChange = null) },
+                modifier = Modifier.toggleable(
+                    value = selected,
+                    role = Role.Checkbox,
+                    onValueChange = { onToggle(summary.list.id, selected) },
+                ),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -940,6 +993,8 @@ private fun DetailContentPreview() {
                 entryId = 1L,
             ),
             onAddToWatchlist = {},
+            onAddToPile = {},
+            onManageLists = {},
             onSetStatus = {},
             onRemoveFromWatchlist = {},
             onMarkAsWatchedClick = {},

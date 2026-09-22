@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 data object HomeRoute
 
 @Serializable
+data object ListsRoute
+
+@Serializable
 data object SettingsRoute
 
 @Serializable
@@ -23,4 +26,9 @@ data object StatisticsRoute
 @Serializable
 data class DetailRoute(
     val mediaId: Long,
+)
+
+@Serializable
+data class ListDetailRoute(
+    val listId: Long,
 )

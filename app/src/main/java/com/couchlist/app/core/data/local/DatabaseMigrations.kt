@@ -71,12 +71,8 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         // Full rebuild because ALTER TABLE RENAME COLUMN requires SQLite >= 3.25
         // (API 30+) but minSdk is 26.
         //
-        // Strategy: disable FK checks, stage ALL tables to _v3, create all v4 tables,
-        // copy data, drop all _v3 tables child-first/parent-last, re-enable FK checks.
-        // This prevents CASCADE/SET NULL actions from firing mid-migration on rename.
-
-        // 0. Disable foreign key checks for the entire migration.
-        db.execSQL("PRAGMA foreign_keys = OFF")
+        // Stage all tables, copy into the new graph, then drop staging tables
+        // child-first. This remains safe with Room's foreign keys enabled.
 
         // 1. Rename every table to _v3 so data is staged for copy.
         db.execSQL("ALTER TABLE media_items RENAME TO media_items_v3")
@@ -332,7 +328,6 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("INSERT INTO watch_provider_cache SELECT * FROM watch_provider_cache_v3")
 
         // 4. Drop all _v3 staging tables (child-first, parent-last).
-        //    With FK checks OFF, order here is just for clarity.
         db.execSQL("DROP TABLE IF EXISTS watch_provider_cache_v3")
         db.execSQL("DROP TABLE IF EXISTS media_list_joins_v3")
         db.execSQL("DROP TABLE IF EXISTS lists_v3")
@@ -411,9 +406,113 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
             """.trimIndent(),
         )
 
-        // 7. Re-enable FK checks and verify constraint integrity.
-        db.execSQL("PRAGMA foreign_keys = ON")
-        db.execSQL("PRAGMA foreign_key_check")
+        assertNoForeignKeyViolations(db)
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS list_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                sort_order INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "ALTER TABLE lists ADD COLUMN group_id INTEGER " +
+                "REFERENCES list_groups(id) ON UPDATE NO ACTION ON DELETE SET NULL",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_lists_group_id ON lists (group_id)")
+
+        // Legacy imports could create list memberships without a LibraryItem.
+        // Backfill those rows before making LibraryItem the membership parent.
+        db.execSQL(
+            """
+            INSERT INTO library_items (
+                media_id, status, progress, personal_rating, favorite, notes,
+                added_at, started_at, completed_at, updated_at
+            )
+            SELECT joins.media_id, 'BACKLOG', NULL, NULL, 0, NULL,
+                MIN(joins.added_at), NULL, NULL, MIN(joins.added_at)
+            FROM media_list_joins joins
+            LEFT JOIN library_items ON library_items.media_id = joins.media_id
+            WHERE library_items.id IS NULL
+            GROUP BY joins.media_id
+            """.trimIndent(),
+        )
+
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS media_list_joins_v5 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                list_id INTEGER NOT NULL,
+                library_item_id INTEGER NOT NULL,
+                added_at INTEGER NOT NULL,
+                FOREIGN KEY (list_id) REFERENCES lists (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY (library_item_id) REFERENCES library_items (id)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO media_list_joins_v5 (id, list_id, library_item_id, added_at)
+            SELECT joins.id, joins.list_id, library_items.id, joins.added_at
+            FROM media_list_joins joins
+            INNER JOIN library_items ON library_items.media_id = joins.media_id
+            """.trimIndent(),
+        )
+        db.execSQL("DROP TABLE media_list_joins")
+        db.execSQL("ALTER TABLE media_list_joins_v5 RENAME TO media_list_joins")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_media_list_joins_list_id " +
+                "ON media_list_joins (list_id)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_media_list_joins_library_item_id " +
+                "ON media_list_joins (library_item_id)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_media_list_joins_list_id_library_item_id " +
+                "ON media_list_joins (list_id, library_item_id)",
+        )
+
+        val now = System.currentTimeMillis()
+        db.execSQL(
+            """
+            INSERT INTO lists (
+                name, description, type, cover_media_id, is_pinned, sort_order,
+                smart_filter_json, created_at, updated_at, group_id
+            )
+            SELECT 'The Pile', NULL, 'PILE', NULL, 1, 0, NULL, ?, ?, NULL
+            WHERE NOT EXISTS (SELECT 1 FROM lists WHERE type = 'PILE')
+            """.trimIndent(),
+            arrayOf<Any?>(now, now),
+        )
+        db.execSQL(
+            """
+            UPDATE lists
+            SET type = 'COLLECTION', is_pinned = 0, updated_at = ?
+            WHERE type = 'PILE'
+            AND id != (SELECT MIN(id) FROM lists WHERE type = 'PILE')
+            """.trimIndent(),
+            arrayOf<Any?>(now),
+        )
+        db.execSQL(
+            """
+            UPDATE lists
+            SET name = 'The Pile', is_pinned = 1, group_id = NULL, updated_at = ?
+            WHERE type = 'PILE'
+            """.trimIndent(),
+            arrayOf<Any?>(now),
+        )
+        assertNoForeignKeyViolations(db)
     }
 }
 
@@ -443,6 +542,14 @@ private fun seedDefaultLists(db: SupportSQLiteDatabase, now: Long) {
         """.trimIndent(),
         arrayOf<Any?>("The Pile", now, now),
     )
+}
+
+private fun assertNoForeignKeyViolations(db: SupportSQLiteDatabase) {
+    db.query("PRAGMA foreign_key_check").use { cursor ->
+        check(!cursor.moveToFirst()) {
+            "Foreign key violation in ${cursor.getString(0)} at row ${cursor.getLong(1)}"
+        }
+    }
 }
 
 private fun createVersionThreeTables(db: SupportSQLiteDatabase) {

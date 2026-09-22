@@ -8,6 +8,7 @@ import androidx.room.Room
 import com.couchlist.app.core.data.local.CouchlistDatabase
 import com.couchlist.app.core.data.local.MIGRATION_1_3
 import com.couchlist.app.core.data.local.MIGRATION_3_4
+import com.couchlist.app.core.data.local.MIGRATION_4_5
 import com.couchlist.app.core.data.local.SEED_DEFAULT_LISTS_CALLBACK
 import com.couchlist.app.core.data.local.dao.LibraryItemDao
 import com.couchlist.app.core.data.local.dao.LogEntryDao
@@ -60,7 +61,7 @@ object DataModule {
             CouchlistDatabase::class.java,
             "couchlist.db",
         )
-            .addMigrations(MIGRATION_1_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_3, MIGRATION_3_4, MIGRATION_4_5)
             .addCallback(SEED_DEFAULT_LISTS_CALLBACK)
             .build()
 

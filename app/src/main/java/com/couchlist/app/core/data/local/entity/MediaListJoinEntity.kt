@@ -7,8 +7,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Membership of a media item in a list (many-to-many). A media item may be in
- * any number of lists; a list may group any number of items.
+ * Membership of a library item in a list (many-to-many). User state and list
+ * membership therefore share the same lifecycle.
  */
 @Entity(
     tableName = "media_list_joins",
@@ -20,16 +20,16 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
         ForeignKey(
-            entity = MediaItemEntity::class,
+            entity = LibraryItemEntity::class,
             parentColumns = ["id"],
-            childColumns = ["media_id"],
+            childColumns = ["library_item_id"],
             onDelete = ForeignKey.CASCADE,
         ),
     ],
     indices = [
         Index(value = ["list_id"]),
-        Index(value = ["media_id"]),
-        Index(value = ["list_id", "media_id"], unique = true),
+        Index(value = ["library_item_id"]),
+        Index(value = ["list_id", "library_item_id"], unique = true),
     ],
 )
 data class MediaListJoinEntity(
@@ -37,8 +37,8 @@ data class MediaListJoinEntity(
     val id: Long = 0L,
     @ColumnInfo(name = "list_id")
     val listId: Long,
-    @ColumnInfo(name = "media_id")
-    val mediaId: Long,
+    @ColumnInfo(name = "library_item_id")
+    val libraryItemId: Long,
     @ColumnInfo(name = "added_at")
     val addedAt: Long = System.currentTimeMillis(),
 )

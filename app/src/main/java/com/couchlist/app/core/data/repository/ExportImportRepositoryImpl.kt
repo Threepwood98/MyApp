@@ -8,11 +8,13 @@ import com.couchlist.app.core.data.local.dao.MediaItemDao
 import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.entity.ExportLibraryItem
 import com.couchlist.app.core.data.local.entity.ExportList
+import com.couchlist.app.core.data.local.entity.ExportListGroup
 import com.couchlist.app.core.data.local.entity.ExportListMembership
 import com.couchlist.app.core.data.local.entity.ExportLogEntry
 import com.couchlist.app.core.data.local.entity.ExportMediaItem
 import com.couchlist.app.core.data.local.entity.LibraryExportData
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
+import com.couchlist.app.core.data.local.entity.ListGroupEntity
 import com.couchlist.app.core.data.local.entity.LogEntryEntity
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.local.entity.MediaListEntity
@@ -38,26 +40,35 @@ class ExportImportRepositoryImpl @Inject constructor(
 
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
-    override suspend fun exportToJson(): String {
+    override suspend fun exportToJson(): String = database.withTransaction {
         val mediaItems = mediaItemDao.getAll().map { entity ->
             val runtime = mediaItemDao.getRuntimeMinutes(entity.id)
             entity.toExport(runtime)
         }
-        val libraryItems = libraryItemDao.getAll().map { entity ->
+        val libraryEntities = libraryItemDao.getAll()
+        val libraryItems = libraryEntities.map { entity ->
             val media = mediaItemDao.getById(entity.mediaId)
             entity.toExport(media)
         }
-        val lists = mediaListDao.getAllLists().map { it.toExport() }
+        val listGroups = mediaListDao.getAllGroups().map { it.toExport() }
+        val lists = mediaListDao.getAllLists().map { list ->
+            val cover = list.coverMediaId?.let { mediaItemDao.getById(it) }
+            list.toExport(cover)
+        }
+        val libraryById = libraryEntities.associateBy { it.id }
         val joins = mediaListDao.getAllJoins()
         val listMemberships = joins.mapNotNull { join ->
             val list = mediaListDao.getListById(join.listId) ?: return@mapNotNull null
-            val media = mediaItemDao.getById(join.mediaId) ?: return@mapNotNull null
+            val library = libraryById[join.libraryItemId] ?: return@mapNotNull null
+            val media = mediaItemDao.getById(library.mediaId) ?: return@mapNotNull null
             ExportListMembership(
+                listId = list.id,
                 source = media.source,
                 category = media.category.name,
                 externalId = media.externalId,
                 listName = list.name,
                 listType = list.type.name,
+                addedAt = join.addedAt,
             )
         }
         val logEntries = logEntryDao.getAll().mapNotNull { entity ->
@@ -68,11 +79,12 @@ class ExportImportRepositoryImpl @Inject constructor(
         val export = LibraryExportData(
             mediaItems = mediaItems,
             libraryItems = libraryItems,
+            listGroups = listGroups,
             lists = lists,
             listMemberships = listMemberships,
             logEntries = logEntries,
         )
-        return json.encodeToString(LibraryExportData.serializer(), export)
+        json.encodeToString(LibraryExportData.serializer(), export)
     }
 
     override suspend fun importFromJson(jsonString: String) {
@@ -83,6 +95,7 @@ class ExportImportRepositoryImpl @Inject constructor(
             logEntryDao.deleteAll()
             mediaListDao.deleteAllJoins()
             mediaListDao.deleteAllLists()
+            mediaListDao.deleteAllGroups()
             libraryItemDao.deleteAll()
             mediaItemDao.deleteAll()
 
@@ -111,19 +124,8 @@ class ExportImportRepositoryImpl @Inject constructor(
                 )
             }
 
-            // Import lists and build list name+type -> local ID map.
-            val listIdMap = mutableMapOf<Pair<String, String>, Long>()
-            val listEntities = data.lists.map { it.toEntity() }
-            mediaListDao.insertAllLists(listEntities)
-            data.lists.forEach { export ->
-                val type = MediaListType.valueOf(export.type)
-                val id = mediaListDao.findListId(export.name, type)
-                if (id != null) {
-                    listIdMap[export.name to export.type] = id
-                }
-            }
-
             // Import library items.
+            val libraryIdMap = mutableMapOf<String, Long>()
             val libraryEntities = data.libraryItems.mapNotNull { export ->
                 val source = export.resolvedSource()
                 val category = MediaCategory.valueOf(export.resolvedCategory())
@@ -133,20 +135,86 @@ class ExportImportRepositoryImpl @Inject constructor(
                 export.toEntity(localMediaId)
             }
             libraryItemDao.insertAll(libraryEntities)
+            data.libraryItems.forEach { export ->
+                val category = MediaCategory.valueOf(export.resolvedCategory())
+                val key = referenceKey(export.resolvedSource(), category, export.resolvedExternalId())
+                val mediaId = mediaIdMap[key] ?: return@forEach
+                libraryItemDao.getByMediaId(mediaId)?.let { libraryIdMap[key] = it.id }
+            }
+
+            // Import groups before lists so group foreign keys can be resolved.
+            val groupIdMap = mutableMapOf<Long, Long>()
+            val groupIds = mediaListDao.insertAllGroups(data.listGroups.map { it.toEntity() })
+            data.listGroups.forEachIndexed { index, export ->
+                export.id?.let { groupIdMap[it] = groupIds[index] }
+            }
+
+            // Import lists and build both v3 ID and legacy name/type maps.
+            val listIdMap = mutableMapOf<Long, Long>()
+            val legacyListIdMap = mutableMapOf<Pair<String, String>, Long>()
+            val listEntities = data.lists.map { export ->
+                val coverMediaId = export.coverReferenceKey()?.let(mediaIdMap::get)
+                export.toEntity(
+                    localGroupId = export.groupId?.let(groupIdMap::get),
+                    coverMediaId = coverMediaId,
+                )
+            }
+            val insertedListIds = mediaListDao.insertAllLists(listEntities)
+            data.lists.forEachIndexed { index, export ->
+                val localId = insertedListIds[index]
+                export.id?.let { listIdMap[it] = localId }
+                legacyListIdMap[export.name to export.type] = localId
+            }
+
+            val now = System.currentTimeMillis()
+            val pile = mediaListDao.getPile() ?: MediaListEntity(
+                name = DEFAULT_PILE_NAME,
+                description = null,
+                type = MediaListType.PILE,
+                groupId = null,
+                coverMediaId = null,
+                isPinned = true,
+                sortOrder = 0,
+                smartFilterJson = null,
+                createdAt = now,
+                updatedAt = now,
+            ).let { list ->
+                list.copy(id = mediaListDao.insertListIgnore(list))
+            }
+            mediaListDao.convertDuplicatePiles(pile.id, now)
+            mediaListDao.normalizePile(pile.id, now)
 
             // Import list memberships.
             val joins = data.listMemberships.mapNotNull { export ->
-                val localListId = listIdMap[export.listName to export.listType]
+                val localListId = export.listId?.let(listIdMap::get)
+                    ?: legacyListIdMap[export.legacyListKey()]
                     ?: return@mapNotNull null
                 val source = export.resolvedSource()
                 val category = MediaCategory.valueOf(export.resolvedCategory())
                 val externalId = export.resolvedExternalId()
-                val localMediaId = mediaIdMap[referenceKey(source, category, externalId)]
+                val key = referenceKey(source, category, externalId)
+                val localMediaId = mediaIdMap[key]
                     ?: return@mapNotNull null
+                val localLibraryItemId = libraryIdMap[key] ?: libraryItemDao.insertIgnore(
+                    LibraryItemEntity(
+                        mediaId = localMediaId,
+                        status = MediaStatus.BACKLOG,
+                        progress = null,
+                        personalRating = null,
+                        favorite = false,
+                        notes = null,
+                        addedAt = export.addedAt.takeIf { it > 0L } ?: now,
+                        startedAt = null,
+                        completedAt = null,
+                        updatedAt = export.addedAt.takeIf { it > 0L } ?: now,
+                    ),
+                ).takeIf { it != -1L }
+                    ?: checkNotNull(libraryItemDao.getByMediaId(localMediaId)).id
+                libraryIdMap[key] = localLibraryItemId
                 MediaListJoinEntity(
                     listId = localListId,
-                    mediaId = localMediaId,
-                    addedAt = System.currentTimeMillis(),
+                    libraryItemId = localLibraryItemId,
+                    addedAt = export.addedAt.takeIf { it > 0L } ?: now,
                 )
             }
             mediaListDao.insertAllJoins(joins)
@@ -165,22 +233,75 @@ class ExportImportRepositoryImpl @Inject constructor(
     }
 
     private fun validateImportData(data: LibraryExportData) {
-        data.mediaItems.forEach { item ->
-            item.resolvedSource()
-            MediaCategory.valueOf(item.resolvedCategory())
-            item.resolvedExternalId()
+        require(data.version in 1..3) { "Unsupported export version ${data.version}" }
+        val mediaKeys = data.mediaItems.map { item ->
+            referenceKey(
+                item.resolvedSource(),
+                MediaCategory.valueOf(item.resolvedCategory()),
+                item.resolvedExternalId(),
+            )
         }
-        data.libraryItems.forEach { item ->
-            item.resolvedSource()
-            MediaCategory.valueOf(item.resolvedCategory())
-            item.resolvedExternalId()
+        require(mediaKeys.size == mediaKeys.toSet().size) { "Duplicate media reference" }
+        val mediaKeySet = mediaKeys.toSet()
+
+        val libraryKeys = data.libraryItems.map { item ->
             MediaStatus.valueOf(item.status)
+            referenceKey(
+                item.resolvedSource(),
+                MediaCategory.valueOf(item.resolvedCategory()),
+                item.resolvedExternalId(),
+            ).also { require(it in mediaKeySet) { "Unknown library media" } }
         }
-        data.lists.forEach { MediaListType.valueOf(it.type) }
+        require(libraryKeys.size == libraryKeys.toSet().size) { "Duplicate library item" }
+
+        if (data.version >= 3) {
+            require(data.listGroups.all { it.id != null }) { "List group ID is required" }
+            require(data.lists.all { it.id != null }) { "List ID is required" }
+        }
+        val groupIdValues = data.listGroups.mapNotNull { it.id }
+        require(groupIdValues.size == groupIdValues.toSet().size) { "Duplicate list group ID" }
+        val groupIds = groupIdValues.toSet()
+        val listIdValues = data.lists.mapNotNull { it.id }
+        require(listIdValues.size == listIdValues.toSet().size) { "Duplicate list ID" }
+        val listIds = listIdValues.toSet()
+        val legacyListKeys = data.lists.map { it.name to it.type }
+        if (data.version < 3) {
+            require(legacyListKeys.size == legacyListKeys.toSet().size) {
+                "Legacy export has ambiguous list names"
+            }
+        }
+        data.lists.forEach { list ->
+            MediaListType.valueOf(list.type)
+            require(list.groupId == null || list.groupId in groupIds) { "Unknown list group" }
+            val coverParts = listOf(list.coverSource, list.coverCategory, list.coverExternalId)
+            require(coverParts.all { it == null } || coverParts.all { it != null }) {
+                "Incomplete list cover reference"
+            }
+            list.coverReferenceKey()?.let { key ->
+                require(key in mediaKeySet) { "Unknown list cover media" }
+            }
+        }
+        data.listMemberships.forEach { membership ->
+            val mediaKey = referenceKey(
+                membership.resolvedSource(),
+                MediaCategory.valueOf(membership.resolvedCategory()),
+                membership.resolvedExternalId(),
+            )
+            require(mediaKey in mediaKeySet) { "Unknown list membership media" }
+            if (membership.listId != null) {
+                require(membership.listId in listIds) { "Unknown list" }
+            } else {
+                require(data.version < 3) { "List membership ID is required" }
+                require(membership.legacyListKey() in legacyListKeys) { "Unknown list" }
+            }
+        }
         data.logEntries.forEach { entry ->
-            entry.resolvedSource()
-            MediaCategory.valueOf(entry.resolvedCategory())
-            entry.resolvedExternalId()
+            val mediaKey = referenceKey(
+                entry.resolvedSource(),
+                MediaCategory.valueOf(entry.resolvedCategory()),
+                entry.resolvedExternalId(),
+            )
+            require(mediaKey in mediaKeySet) { "Unknown log entry media" }
             LogAction.valueOf(entry.action)
         }
     }
@@ -263,26 +384,56 @@ class ExportImportRepositoryImpl @Inject constructor(
         updatedAt = updatedAt,
     )
 
-    private fun MediaListEntity.toExport() = ExportList(
+    private fun ListGroupEntity.toExport() = ExportListGroup(
+        id = id,
+        name = name,
+        sortOrder = sortOrder,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
+    private fun MediaListEntity.toExport(cover: MediaItemEntity?) = ExportList(
+        id = id,
         name = name,
         description = description,
         type = type.name,
+        groupId = groupId,
+        coverSource = cover?.source,
+        coverCategory = cover?.category?.name,
+        coverExternalId = cover?.externalId,
         isPinned = isPinned,
         sortOrder = sortOrder,
         smartFilterJson = smartFilterJson,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 
-    private fun ExportList.toEntity() = MediaListEntity(
+    private fun ExportList.toEntity(localGroupId: Long?, coverMediaId: Long?) = MediaListEntity(
         name = name,
         description = description,
         type = MediaListType.valueOf(type),
-        coverMediaId = null,
+        groupId = localGroupId,
+        coverMediaId = coverMediaId,
         isPinned = isPinned,
         sortOrder = sortOrder,
         smartFilterJson = smartFilterJson,
-        createdAt = System.currentTimeMillis(),
-        updatedAt = System.currentTimeMillis(),
+        createdAt = createdAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+        updatedAt = updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
     )
+
+    private fun ExportListGroup.toEntity() = ListGroupEntity(
+        name = name,
+        sortOrder = sortOrder,
+        createdAt = createdAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+        updatedAt = updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+    )
+
+    private fun ExportList.coverReferenceKey(): String? {
+        val source = coverSource ?: return null
+        val category = coverCategory?.let(MediaCategory::valueOf) ?: return null
+        val externalId = coverExternalId ?: return null
+        return referenceKey(source, category, externalId)
+    }
 
     private fun LogEntryEntity.toExport(media: MediaItemEntity) = ExportLogEntry(
         source = media.source,
@@ -309,4 +460,8 @@ class ExportImportRepositoryImpl @Inject constructor(
 
     private fun referenceKey(source: String, category: MediaCategory, externalId: String): String =
         "$source:${category.name}:$externalId"
+
+    private companion object {
+        const val DEFAULT_PILE_NAME = "The Pile"
+    }
 }

@@ -16,8 +16,17 @@ import com.couchlist.app.core.domain.model.MediaListType
             childColumns = ["cover_media_id"],
             onDelete = ForeignKey.SET_NULL,
         ),
+        ForeignKey(
+            entity = ListGroupEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["group_id"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
     ],
-    indices = [Index(value = ["cover_media_id"])],
+    indices = [
+        Index(value = ["cover_media_id"]),
+        Index(value = ["group_id"]),
+    ],
 )
 data class MediaListEntity(
     @PrimaryKey(autoGenerate = true)
@@ -25,6 +34,8 @@ data class MediaListEntity(
     val name: String,
     val description: String?,
     val type: MediaListType,
+    @ColumnInfo(name = "group_id")
+    val groupId: Long?,
     @ColumnInfo(name = "cover_media_id")
     val coverMediaId: Long?,
     @ColumnInfo(name = "is_pinned")

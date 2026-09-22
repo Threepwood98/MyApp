@@ -410,7 +410,7 @@ private fun ListSummaryCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Box {
+                if (summary.list.type != MediaListType.PILE) Box {
                     IconButton(
                         onClick = { showMenu = true },
                         modifier = Modifier.size(24.dp),

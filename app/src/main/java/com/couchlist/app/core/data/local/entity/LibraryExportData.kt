@@ -10,13 +10,23 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class LibraryExportData(
-    val version: Int = 2,
+    val version: Int = 3,
     val exportedAt: Long = System.currentTimeMillis(),
     val mediaItems: List<ExportMediaItem>,
     val libraryItems: List<ExportLibraryItem>,
+    val listGroups: List<ExportListGroup> = emptyList(),
     val lists: List<ExportList>,
     val listMemberships: List<ExportListMembership>,
     val logEntries: List<ExportLogEntry>,
+)
+
+@Serializable
+data class ExportListGroup(
+    val id: Long? = null,
+    val name: String,
+    val sortOrder: Int = 0,
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,
 )
 
 @Serializable
@@ -82,16 +92,24 @@ data class ExportLibraryItem(
 
 @Serializable
 data class ExportList(
+    val id: Long? = null,
     val name: String,
     val description: String? = null,
     val type: String,
+    val groupId: Long? = null,
+    val coverSource: String? = null,
+    val coverCategory: String? = null,
+    val coverExternalId: String? = null,
     val isPinned: Boolean = false,
     val sortOrder: Int = 0,
     val smartFilterJson: String? = null,
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,
 )
 
 @Serializable
 data class ExportListMembership(
+    val listId: Long? = null,
     // v2 fields
     val source: String? = null,
     val category: String? = null,
@@ -99,8 +117,9 @@ data class ExportListMembership(
     // v1 legacy fields
     val mediaType: String? = null,
     val tmdbId: Long? = null,
-    val listName: String,
-    val listType: String,
+    val listName: String? = null,
+    val listType: String? = null,
+    val addedAt: Long = 0L,
 ) {
     fun resolvedSource(): String = source ?: "tmdb"
 
@@ -108,6 +127,10 @@ data class ExportListMembership(
 
     fun resolvedExternalId(): String =
         externalId ?: (tmdbId?.toString() ?: throw IllegalArgumentException("No external ID"))
+
+    fun legacyListKey(): Pair<String, String> =
+        checkNotNull(listName) { "No list name" } to
+            checkNotNull(listType) { "No list type" }
 }
 
 @Serializable

@@ -1,10 +1,13 @@
 package com.couchlist.app
 
-import androidx.room.Room
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteOpenHelper
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.platform.app.InstrumentationRegistry
 import com.couchlist.app.core.data.local.CouchlistDatabase
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -90,7 +93,7 @@ class CouchlistDatabaseMigrationTest {
         )
 
         val cursor = db.query("SELECT source, category, external_id, title, description, artwork_uri, backdrop_uri FROM media_items WHERE id = 1")
-        assert(cursor.moveToFirst())
+        assertTrue(cursor.moveToFirst())
         assertEquals("tmdb", cursor.getString(cursor.getColumnIndexOrThrow("source")))
         assertEquals("MOVIE", cursor.getString(cursor.getColumnIndexOrThrow("category")))
         assertEquals("12345", cursor.getString(cursor.getColumnIndexOrThrow("external_id")))
@@ -101,47 +104,85 @@ class CouchlistDatabaseMigrationTest {
         cursor.close()
 
         val runtimeCursor = db.query("SELECT runtime_minutes FROM video_metadata WHERE media_id = 1")
-        assert(runtimeCursor.moveToFirst())
+        assertTrue(runtimeCursor.moveToFirst())
         assertEquals(120, runtimeCursor.getInt(runtimeCursor.getColumnIndexOrThrow("runtime_minutes")))
         runtimeCursor.close()
 
         val seasonCursor = db.query("SELECT artwork_uri, name FROM seasons WHERE media_id = 2")
-        assert(seasonCursor.moveToFirst())
+        assertTrue(seasonCursor.moveToFirst())
         assertEquals("Season 1", seasonCursor.getString(seasonCursor.getColumnIndexOrThrow("name")))
         assertEquals("https://image.tmdb.org/t/p/w500/season.jpg", seasonCursor.getString(seasonCursor.getColumnIndexOrThrow("artwork_uri")))
         seasonCursor.close()
 
         val episodeCursor = db.query("SELECT artwork_uri, runtime_minutes FROM episodes WHERE media_id = 2")
-        assert(episodeCursor.moveToFirst())
+        assertTrue(episodeCursor.moveToFirst())
         assertEquals("https://image.tmdb.org/t/p/w300/still.jpg", episodeCursor.getString(episodeCursor.getColumnIndexOrThrow("artwork_uri")))
         assertEquals(45, episodeCursor.getInt(episodeCursor.getColumnIndexOrThrow("runtime_minutes")))
         episodeCursor.close()
 
         val libCursor = db.query("SELECT media_id, status FROM library_items WHERE media_id = 1")
-        assert(libCursor.moveToFirst())
+        assertTrue(libCursor.moveToFirst())
         assertEquals(1, libCursor.getInt(libCursor.getColumnIndexOrThrow("media_id")))
         assertEquals("COMPLETED", libCursor.getString(libCursor.getColumnIndexOrThrow("status")))
         libCursor.close()
 
         val logCursor = db.query("SELECT action FROM log_entries WHERE media_id = 1 AND action = 'COMPLETED'")
-        assert(logCursor.moveToFirst())
+        assertTrue(logCursor.moveToFirst())
         assertEquals("COMPLETED", logCursor.getString(logCursor.getColumnIndexOrThrow("action")))
         logCursor.close()
     }
 
     @Test
-    fun migrate1To3To4() {
-        var db = helper.createDatabase(TEST_DB_NAME, 1).apply {
+    fun migrate1To3To4To5() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(TEST_DB_NAME)
+        val versionOneHelper = FrameworkSQLiteOpenHelperFactory().create(
+            SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(TEST_DB_NAME)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(1) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                """
+                                CREATE TABLE watchlist_items (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                    media_type TEXT NOT NULL,
+                                    tmdb_id INTEGER NOT NULL,
+                                    title TEXT NOT NULL,
+                                    poster_path TEXT,
+                                    status TEXT NOT NULL,
+                                    sort_order INTEGER NOT NULL,
+                                    added_at INTEGER NOT NULL
+                                )
+                                """.trimIndent(),
+                            )
+                            db.execSQL(
+                                "CREATE UNIQUE INDEX index_watchlist_items_tmdb_id_media_type " +
+                                    "ON watchlist_items (tmdb_id, media_type)",
+                            )
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) = Unit
+                    },
+                )
+                .build(),
+        )
+        versionOneHelper.writableDatabase.apply {
             execSQL(
                 """
-                INSERT INTO watchlist_items (tmdb_id, media_type, status, added_at)
-                VALUES (12345, 'MOVIE', 'WATCHED', 1000000)
+                INSERT INTO watchlist_items (
+                    media_type, tmdb_id, title, poster_path, status, sort_order, added_at
+                ) VALUES ('MOVIE', 12345, 'Test Movie', '/poster.jpg', 'WATCHED', 0, 1000000)
                 """.trimIndent(),
             )
-            close()
         }
+        versionOneHelper.close()
 
-        db = helper.runMigrationsAndValidate(
+        var db = helper.runMigrationsAndValidate(
             TEST_DB_NAME,
             3,
             true,
@@ -155,12 +196,136 @@ class CouchlistDatabaseMigrationTest {
             com.couchlist.app.core.data.local.MIGRATION_3_4,
         )
 
+        db = helper.runMigrationsAndValidate(
+            TEST_DB_NAME,
+            5,
+            true,
+            com.couchlist.app.core.data.local.MIGRATION_4_5,
+        )
+
         val cursor = db.query("SELECT source, category, external_id, title FROM media_items")
-        assert(cursor.moveToFirst())
+        assertTrue(cursor.moveToFirst())
         assertEquals("tmdb", cursor.getString(cursor.getColumnIndexOrThrow("source")))
         assertEquals("MOVIE", cursor.getString(cursor.getColumnIndexOrThrow("category")))
         assertEquals("12345", cursor.getString(cursor.getColumnIndexOrThrow("external_id")))
         cursor.close()
+
+        db.query("SELECT COUNT(*) FROM lists WHERE type = 'PILE'").use { pileCursor ->
+            assertTrue(pileCursor.moveToFirst())
+            assertEquals(1, pileCursor.getInt(0))
+        }
+    }
+
+    @Test
+    fun migrate4To5PreservesListsAndBackfillsLibraryMemberships() {
+        var db = helper.createDatabase(TEST_DB_NAME, 4).apply {
+            insertV4Media(1, "MOVIE", "101", "First")
+            insertV4Media(2, "TV", "202", "Second")
+            execSQL(
+                """
+                INSERT INTO library_items (
+                    id, media_id, status, progress, personal_rating, favorite, notes,
+                    added_at, started_at, completed_at, updated_at
+                ) VALUES (7, 2, 'BACKLOG', NULL, NULL, 0, NULL, 200, NULL, NULL, 200)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO lists (
+                    id, name, description, type, cover_media_id, is_pinned, sort_order,
+                    smart_filter_json, created_at, updated_at
+                ) VALUES
+                    (10, 'Favorites', 'Keepers', 'COLLECTION', 1, 1, 4, NULL, 100, 101),
+                    (11, 'Inbox', NULL, 'PILE', NULL, 1, 0, NULL, 100, 100),
+                    (12, 'Spare Pile', NULL, 'PILE', NULL, 1, 1, NULL, 100, 100)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO media_list_joins (id, list_id, media_id, added_at)
+                VALUES (20, 10, 1, 300), (21, 12, 2, 400)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        db = helper.runMigrationsAndValidate(
+            TEST_DB_NAME,
+            5,
+            true,
+            com.couchlist.app.core.data.local.MIGRATION_4_5,
+        )
+
+        db.query("SELECT name, description, cover_media_id, is_pinned, sort_order, group_id FROM lists WHERE id = 10").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Favorites", cursor.getString(0))
+            assertEquals("Keepers", cursor.getString(1))
+            assertEquals(1, cursor.getInt(2))
+            assertEquals(1, cursor.getInt(3))
+            assertEquals(4, cursor.getInt(4))
+            assertTrue(cursor.isNull(5))
+        }
+        db.query("SELECT id, status FROM library_items WHERE media_id = 1").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            val libraryId = cursor.getLong(0)
+            assertEquals("BACKLOG", cursor.getString(1))
+            db.query("SELECT library_item_id, added_at FROM media_list_joins WHERE id = 20").use { join ->
+                assertTrue(join.moveToFirst())
+                assertEquals(libraryId, join.getLong(0))
+                assertEquals(300L, join.getLong(1))
+            }
+        }
+        db.query("SELECT COUNT(*) FROM lists WHERE type = 'PILE'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        db.query("SELECT name, type FROM lists WHERE id = 12").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Spare Pile", cursor.getString(0))
+            assertEquals("COLLECTION", cursor.getString(1))
+        }
+        db.query("SELECT name FROM lists WHERE id = 11").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("The Pile", cursor.getString(0))
+        }
+        db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+    }
+
+    @Test
+    fun migrate4To5CreatesMissingPile() {
+        var db = helper.createDatabase(TEST_DB_NAME, 4).apply { close() }
+
+        db = helper.runMigrationsAndValidate(
+            TEST_DB_NAME,
+            5,
+            true,
+            com.couchlist.app.core.data.local.MIGRATION_4_5,
+        )
+
+        db.query("SELECT name, is_pinned, group_id FROM lists WHERE type = 'PILE'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("The Pile", cursor.getString(0))
+            assertEquals(1, cursor.getInt(1))
+            assertTrue(cursor.isNull(2))
+        }
+    }
+
+    private fun SupportSQLiteDatabase.insertV4Media(
+        id: Long,
+        category: String,
+        externalId: String,
+        title: String,
+    ) {
+        execSQL(
+            """
+            INSERT INTO media_items (
+                id, source, category, external_id, title, original_title, description,
+                artwork_uri, backdrop_uri, release_date, original_language, external_rating,
+                external_vote_count, genres, last_refreshed_at, created_at, updated_at
+            ) VALUES (?, 'tmdb', ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 0.0, 0, NULL, NULL, 100, 100)
+            """.trimIndent(),
+            arrayOf<Any?>(id, category, externalId, title),
+        )
     }
 
     private fun assertEquals(expected: Any?, actual: Any?) {

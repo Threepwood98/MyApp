@@ -8,4 +8,6 @@ data class MediaListSummaryRow(
     val list: MediaListEntity,
     @ColumnInfo(name = "item_count")
     val itemCount: Int,
+    @ColumnInfo(name = "cover_artwork_uri")
+    val coverArtworkUri: String?,
 )

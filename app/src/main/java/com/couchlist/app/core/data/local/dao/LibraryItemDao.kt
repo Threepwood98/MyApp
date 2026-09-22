@@ -11,7 +11,7 @@ import com.couchlist.app.core.data.local.entity.MediaReferenceRow
 import com.couchlist.app.core.domain.model.MediaStatus
 import kotlinx.coroutines.flow.Flow
 
-private const val LIBRARY_MEDIA_SELECT =
+internal const val LIBRARY_MEDIA_COLUMNS =
     "SELECT " +
         "media_items.id AS m_id, " +
         "media_items.source AS m_source, " +
@@ -40,7 +40,10 @@ private const val LIBRARY_MEDIA_SELECT =
         "library_items.added_at AS lib_added_at, " +
         "library_items.started_at AS lib_started_at, " +
         "library_items.completed_at AS lib_completed_at, " +
-        "library_items.updated_at AS lib_updated_at " +
+        "library_items.updated_at AS lib_updated_at "
+
+private const val LIBRARY_MEDIA_SELECT =
+    LIBRARY_MEDIA_COLUMNS +
         "FROM library_items " +
         "INNER JOIN media_items ON library_items.media_id = media_items.id " +
         "LEFT JOIN video_metadata ON video_metadata.media_id = media_items.id "

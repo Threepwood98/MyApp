@@ -20,6 +20,7 @@ data class MediaList(
     val name: String,
     val description: String?,
     val type: MediaListType,
+    val groupId: Long?,
     val coverMediaId: Long?,
     val isPinned: Boolean,
     val sortOrder: Int,
@@ -31,4 +32,5 @@ data class MediaList(
 data class MediaListSummary(
     val list: MediaList,
     val itemCount: Int,
+    val coverArtworkUri: String?,
 )

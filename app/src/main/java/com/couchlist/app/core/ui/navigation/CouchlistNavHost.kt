@@ -27,6 +27,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.couchlist.app.feature.detail.DetailRoute as DetailScreen
 import com.couchlist.app.feature.home.HomeRoute
 import com.couchlist.app.feature.library.LibraryRoute as LibraryScreen
+import com.couchlist.app.feature.lists.ListDetailRoute as ListDetailScreen
+import com.couchlist.app.feature.lists.ListsRoute as ListsScreen
 import com.couchlist.app.feature.logbook.LogbookRoute as LogbookScreen
 import com.couchlist.app.feature.search.SearchRoute as SearchScreen
 import com.couchlist.app.feature.settings.SettingsRoute as SettingsScreen
@@ -38,11 +40,9 @@ fun CouchlistNavHost(
     modifier: Modifier = Modifier,
 ) {
     val destinations = listOf(
-        TopLevelDestination(HomeRoute, "Home", Icons.Filled.Home),
+        TopLevelDestination(ListsRoute, "Lists", Icons.AutoMirrored.Filled.List),
         TopLevelDestination(SearchRoute, "Search", Icons.Filled.Search),
-        TopLevelDestination(LibraryRoute, "Library", Icons.AutoMirrored.Filled.List),
         TopLevelDestination(LogbookRoute, "Logbook", Icons.Filled.DateRange),
-        TopLevelDestination(StatisticsRoute, "Stats", Icons.Filled.Info),
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -83,9 +83,19 @@ fun CouchlistNavHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = HomeRoute,
+            startDestination = ListsRoute,
             modifier = Modifier.padding(innerPadding),
         ) {
+            composable<ListsRoute> {
+                ListsScreen(
+                    onListClick = { listId -> navController.navigate(ListDetailRoute(listId)) },
+                    onSearchClick = { navController.navigateTopLevel(SearchRoute) },
+                    onDashboardClick = { navController.navigate(HomeRoute) },
+                    onLibraryClick = { navController.navigate(LibraryRoute) },
+                    onStatisticsClick = { navController.navigate(StatisticsRoute) },
+                    onSettingsClick = { navController.navigate(SettingsRoute) },
+                )
+            }
             composable<HomeRoute> {
                 HomeRoute(
                     onSearchClick = { navController.navigateTopLevel(SearchRoute) },
@@ -116,6 +126,12 @@ fun CouchlistNavHost(
             composable<DetailRoute> {
                 DetailScreen(onBack = { navController.popBackStack() })
             }
+            composable<ListDetailRoute> {
+                ListDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onItemClick = { mediaId -> navController.navigate(DetailRoute(mediaId)) },
+                )
+            }
         }
     }
 }
@@ -129,6 +145,7 @@ private fun NavHostController.navigateTopLevel(route: Any) {
 }
 
 private fun NavDestination?.matches(route: Any): Boolean = when (route) {
+    ListsRoute -> this?.hasRoute<ListsRoute>() == true
     HomeRoute -> this?.hasRoute<HomeRoute>() == true
     SearchRoute -> this?.hasRoute<SearchRoute>() == true
     LibraryRoute -> this?.hasRoute<LibraryRoute>() == true

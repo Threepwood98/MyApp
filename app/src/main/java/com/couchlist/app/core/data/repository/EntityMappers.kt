@@ -2,6 +2,7 @@ package com.couchlist.app.core.data.repository
 
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
 import com.couchlist.app.core.data.local.entity.LibraryMediaRow
+import com.couchlist.app.core.data.local.entity.ListGroupEntity
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.local.entity.MediaItemWithRuntimeRow
 import com.couchlist.app.core.data.local.entity.MediaListEntity
@@ -10,6 +11,7 @@ import com.couchlist.app.core.data.local.entity.SeasonEntity
 import com.couchlist.app.core.data.local.entity.TvEpisodeWithStateRow
 import com.couchlist.app.core.domain.model.LibraryItem
 import com.couchlist.app.core.domain.model.LibraryMedia
+import com.couchlist.app.core.domain.model.ListGroup
 import com.couchlist.app.core.domain.model.MediaItem
 import com.couchlist.app.core.domain.model.MediaMetadata
 import com.couchlist.app.core.domain.model.MediaReference
@@ -89,6 +91,7 @@ internal fun MediaListEntity.toDomain() = MediaList(
     name = name,
     description = description,
     type = type,
+    groupId = groupId,
     coverMediaId = coverMediaId,
     isPinned = isPinned,
     sortOrder = sortOrder,
@@ -100,6 +103,15 @@ internal fun MediaListEntity.toDomain() = MediaList(
 internal fun MediaListSummaryRow.toDomain() = MediaListSummary(
     list = list.toDomain(),
     itemCount = itemCount,
+    coverArtworkUri = coverArtworkUri,
+)
+
+internal fun ListGroupEntity.toDomain() = ListGroup(
+    id = id,
+    name = name,
+    sortOrder = sortOrder,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
 )
 
 internal fun SeasonEntity.toDomain() = TvSeason(

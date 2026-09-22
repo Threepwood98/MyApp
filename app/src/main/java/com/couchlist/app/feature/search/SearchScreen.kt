@@ -89,7 +89,7 @@ fun SearchRoute(
         showBack = showBack,
         onQueryChange = viewModel::onQueryChange,
         onRetry = viewModel::onRetry,
-        onAddToWatchlist = viewModel::onAddToWatchlist,
+        onAddToPile = viewModel::onAddToPile,
         onResultClick = viewModel::onResultClick,
     )
 }
@@ -103,7 +103,7 @@ private fun SearchContent(
     showBack: Boolean,
     onQueryChange: (String) -> Unit,
     onRetry: () -> Unit,
-    onAddToWatchlist: (MediaSearchResult) -> Unit,
+    onAddToPile: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
     Scaffold(
@@ -143,7 +143,8 @@ private fun SearchContent(
                 else -> SearchResultsGrid(
                     results = uiState.results,
                     inLibraryReferences = uiState.inLibraryReferences,
-                    onAddToWatchlist = onAddToWatchlist,
+                    inPileReferences = uiState.inPileReferences,
+                    onAddToPile = onAddToPile,
                     onResultClick = onResultClick,
                 )
             }
@@ -232,7 +233,8 @@ private fun SearchErrorState(
 private fun SearchResultsGrid(
     results: List<MediaSearchResult>,
     inLibraryReferences: Set<MediaReference>,
-    onAddToWatchlist: (MediaSearchResult) -> Unit,
+    inPileReferences: Set<MediaReference>,
+    onAddToPile: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
     LazyVerticalGrid(
@@ -246,7 +248,8 @@ private fun SearchResultsGrid(
             MediaResultCard(
                 result = result,
                 isInLibrary = result.reference in inLibraryReferences,
-                onAddToWatchlist = onAddToWatchlist,
+                isInPile = result.reference in inPileReferences,
+                onAddToPile = onAddToPile,
                 onResultClick = onResultClick,
             )
         }
@@ -257,7 +260,8 @@ private fun SearchResultsGrid(
 private fun MediaResultCard(
     result: MediaSearchResult,
     isInLibrary: Boolean,
-    onAddToWatchlist: (MediaSearchResult) -> Unit,
+    isInPile: Boolean,
+    onAddToPile: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
     Column(modifier = Modifier.clickable { onResultClick(result) }) {
@@ -283,7 +287,7 @@ private fun MediaResultCard(
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
-            if (isInLibrary) {
+            if (isInLibrary || isInPile) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     shape = MaterialTheme.shapes.extraSmall,
@@ -303,22 +307,23 @@ private fun MediaResultCard(
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
-                            text = "In library",
+                            text = if (isInPile) "In Pile" else "In library",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                     }
                 }
-            } else {
+            }
+            if (!isInPile) {
                 IconButton(
-                    onClick = { onAddToWatchlist(result) },
+                    onClick = { onAddToPile(result) },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(4.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Add ${result.title} to Watchlist",
+                        contentDescription = "Add ${result.title} to The Pile",
                     )
                 }
             }
@@ -377,7 +382,7 @@ private fun SearchResultsPreview() {
             showBack = true,
             onQueryChange = {},
             onRetry = {},
-            onAddToWatchlist = {},
+            onAddToPile = {},
             onResultClick = {},
         )
     }

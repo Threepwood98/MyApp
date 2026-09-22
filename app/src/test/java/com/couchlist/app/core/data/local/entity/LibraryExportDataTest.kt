@@ -12,7 +12,7 @@ class LibraryExportDataTest {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     @Test
-    fun `v2 export includes source category and externalId`() {
+    fun `v3 export includes source category and externalId`() {
         val export = LibraryExportData(
             mediaItems = listOf(
                 ExportMediaItem(
@@ -31,7 +31,7 @@ class LibraryExportDataTest {
         assertTrue(encoded.contains("\"source\""))
         assertTrue(encoded.contains("\"category\""))
         assertTrue(encoded.contains("\"externalId\""))
-        assertEquals(2, export.version)
+        assertEquals(3, export.version)
     }
 
     @Test
@@ -64,7 +64,7 @@ class LibraryExportDataTest {
     }
 
     @Test
-    fun `v2 export round trip preserves all fields`() {
+    fun `v3 export round trip preserves all fields`() {
         val export = LibraryExportData(
             mediaItems = listOf(
                 ExportMediaItem(
@@ -92,7 +92,7 @@ class LibraryExportDataTest {
         val encoded = json.encodeToString(LibraryExportData.serializer(), export)
         val decoded = json.decodeFromString(LibraryExportData.serializer(), encoded)
 
-        assertEquals(2, decoded.version)
+        assertEquals(3, decoded.version)
         val item = decoded.mediaItems[0]
         assertEquals("tmdb", item.source)
         assertEquals("TV", item.category)
@@ -132,6 +132,57 @@ class LibraryExportDataTest {
         assertEquals("custom", entry.resolvedSource())
         assertEquals("BOOK", entry.resolvedCategory())
         assertEquals("abc", entry.resolvedExternalId())
+    }
+
+    @Test
+    fun `v2 export defaults groups to empty`() {
+        val encoded = """
+            {
+                "version": 2,
+                "mediaItems": [],
+                "libraryItems": [],
+                "lists": [],
+                "listMemberships": [],
+                "logEntries": []
+            }
+        """.trimIndent()
+
+        val decoded = json.decodeFromString(LibraryExportData.serializer(), encoded)
+
+        assertEquals(2, decoded.version)
+        assertEquals(emptyList<ExportListGroup>(), decoded.listGroups)
+    }
+
+    @Test
+    fun `v3 export preserves group and stable list references`() {
+        val export = LibraryExportData(
+            mediaItems = emptyList(),
+            libraryItems = emptyList(),
+            listGroups = listOf(ExportListGroup(id = 4, name = "Weekend", sortOrder = 1)),
+            lists = listOf(
+                ExportList(id = 8, name = "Movies", type = "TODO", groupId = 4),
+            ),
+            listMemberships = listOf(
+                ExportListMembership(
+                    listId = 8,
+                    source = "tmdb",
+                    category = "MOVIE",
+                    externalId = "550",
+                    addedAt = 42,
+                ),
+            ),
+            logEntries = emptyList(),
+        )
+
+        val decoded = json.decodeFromString(
+            LibraryExportData.serializer(),
+            json.encodeToString(LibraryExportData.serializer(), export),
+        )
+
+        assertEquals(4L, decoded.listGroups.single().id)
+        assertEquals(4L, decoded.lists.single().groupId)
+        assertEquals(8L, decoded.listMemberships.single().listId)
+        assertEquals(42L, decoded.listMemberships.single().addedAt)
     }
 
     private fun assertTrue(condition: Boolean) {

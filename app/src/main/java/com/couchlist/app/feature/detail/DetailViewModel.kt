@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.couchlist.app.core.common.networkErrorMessage
 import com.couchlist.app.core.domain.model.MediaDetail
 import com.couchlist.app.core.domain.model.MediaItem
+import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaStatus
 import com.couchlist.app.core.domain.model.TvEpisode
 import com.couchlist.app.core.domain.model.TvProgress
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -59,6 +61,7 @@ class DetailViewModel @Inject constructor(
             }
         } else {
             observeDetail()
+            observeListMemberships()
             observeSeasons()
             observeEpisodes()
             observeProgress()
@@ -117,6 +120,24 @@ class DetailViewModel @Inject constructor(
             }
             libraryRepository.addToWatchlist(mediaId)
             _events.send(DetailEvent.ShowMessage("Added ${detail.title} to your Watchlist"))
+        }
+    }
+
+    fun onAddToPile() {
+        viewModelScope.launch {
+            val detail = _uiState.value.detail ?: return@launch
+            libraryRepository.addToPile(mediaId)
+            _events.send(DetailEvent.ShowMessage("Added ${detail.title} to The Pile"))
+        }
+    }
+
+    fun onListMembershipChange(listId: Long, isMember: Boolean) {
+        viewModelScope.launch {
+            if (isMember) {
+                _uiState.value.entryId?.let { libraryRepository.removeFromList(listId, it) }
+            } else {
+                libraryRepository.addToList(listId, mediaId)
+            }
         }
     }
 
@@ -214,6 +235,25 @@ class DetailViewModel @Inject constructor(
                             errorMessage = if (media != null) null else state.errorMessage,
                         )
                     }
+                }
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeListMemberships() {
+        viewModelScope.launch {
+            libraryRepository.observeLists().collect { lists ->
+                _uiState.update { it.copy(lists = lists) }
+            }
+        }
+        viewModelScope.launch {
+            libraryRepository.observeEntry(mediaId)
+                .flatMapLatest { entry ->
+                    if (entry == null) flowOf(emptySet())
+                    else libraryRepository.observeMembershipListIds(entry.id)
+                }
+                .collect { memberships ->
+                    _uiState.update { it.copy(listMembershipIds = memberships) }
                 }
         }
     }
@@ -332,6 +372,8 @@ data class DetailUiState(
     val favorite: Boolean = false,
     val personalRating: Int? = null,
     val notes: String? = null,
+    val lists: List<MediaListSummary> = emptyList(),
+    val listMembershipIds: Set<Long> = emptySet(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val isOffline: Boolean = false,

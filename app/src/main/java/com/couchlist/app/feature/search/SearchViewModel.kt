@@ -38,12 +38,19 @@ class SearchViewModel @Inject constructor(
     val events: Flow<SearchEvent> = _events.receiveAsFlow()
 
     private val libraryMediaReferences = MutableStateFlow<Set<MediaReference>>(emptySet())
+    private val pileMediaReferences = MutableStateFlow<Set<MediaReference>>(emptySet())
 
     init {
         viewModelScope.launch {
             libraryRepository.observeAllMediaReferences().collect { references ->
                 libraryMediaReferences.value = references
-                refreshInLibraryStatus()
+                refreshMembershipStatus()
+            }
+        }
+        viewModelScope.launch {
+            libraryRepository.observePileMediaReferences().collect { references ->
+                pileMediaReferences.value = references
+                refreshMembershipStatus()
             }
         }
         viewModelScope.launch {
@@ -63,18 +70,18 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch { search(uiState.value.query) }
     }
 
-    fun onAddToWatchlist(result: MediaSearchResult) {
+    fun onAddToPile(result: MediaSearchResult) {
         viewModelScope.launch {
             try {
                 val media = catalogRepository.getOrCreate(result)
-                if (libraryRepository.isInLibrary(media.id)) {
+                if (result.reference in pileMediaReferences.value) {
                     _events.send(
-                        SearchEvent.ShowMessage("${result.title} is already in your Watchlist"),
+                        SearchEvent.ShowMessage("${result.title} is already in The Pile"),
                     )
                 } else {
-                    libraryRepository.addToWatchlist(media.id)
+                    libraryRepository.addToPile(media.id)
                     _events.send(
-                        SearchEvent.ShowMessage("Added ${result.title} to your Watchlist"),
+                        SearchEvent.ShowMessage("Added ${result.title} to The Pile"),
                     )
                 }
             } catch (e: CancellationException) {
@@ -110,10 +117,12 @@ class SearchViewModel @Inject constructor(
             .onSuccess { results ->
                 val references = results.map { it.reference }.toSet()
                 val foundInLibrary = libraryMediaReferences.value.intersect(references)
+                val foundInPile = pileMediaReferences.value.intersect(references)
                 _uiState.update {
                     it.copy(
                         results = results,
                         inLibraryReferences = foundInLibrary,
+                        inPileReferences = foundInPile,
                         isSearching = false,
                         errorMessage = null,
                     )
@@ -126,14 +135,19 @@ class SearchViewModel @Inject constructor(
             }
     }
 
-    private fun refreshInLibraryStatus() {
-        val currentReferences = libraryMediaReferences.value
+    private fun refreshMembershipStatus() {
+        val libraryReferences = libraryMediaReferences.value
+        val pileReferences = pileMediaReferences.value
         _uiState.update { state ->
             state.copy(
                 inLibraryReferences = state.results
                     .map { it.reference }
                     .toSet()
-                    .intersect(currentReferences),
+                    .intersect(libraryReferences),
+                inPileReferences = state.results
+                    .map { it.reference }
+                    .toSet()
+                    .intersect(pileReferences),
             )
         }
     }
@@ -143,6 +157,7 @@ data class SearchUiState(
     val query: String = "",
     val results: List<MediaSearchResult> = emptyList(),
     val inLibraryReferences: Set<MediaReference> = emptySet(),
+    val inPileReferences: Set<MediaReference> = emptySet(),
     val isSearching: Boolean = false,
     val errorMessage: String? = null,
 )

@@ -9,6 +9,7 @@ import com.couchlist.app.core.data.local.dao.MediaListDao
 import com.couchlist.app.core.data.local.dao.TvDao
 import com.couchlist.app.core.data.local.entity.EpisodeEntity
 import com.couchlist.app.core.data.local.entity.LibraryItemEntity
+import com.couchlist.app.core.data.local.entity.ListGroupEntity
 import com.couchlist.app.core.data.local.entity.LogEntryEntity
 import com.couchlist.app.core.data.local.entity.MediaItemEntity
 import com.couchlist.app.core.data.local.entity.MediaListEntity
@@ -22,6 +23,7 @@ import com.couchlist.app.core.data.local.entity.WatchProviderCacheEntity
         MediaItemEntity::class,
         VideoMetadataEntity::class,
         LibraryItemEntity::class,
+        ListGroupEntity::class,
         MediaListEntity::class,
         MediaListJoinEntity::class,
         SeasonEntity::class,
@@ -29,7 +31,7 @@ import com.couchlist.app.core.data.local.entity.WatchProviderCacheEntity
         LogEntryEntity::class,
         WatchProviderCacheEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class CouchlistDatabase : RoomDatabase() {
