@@ -194,14 +194,7 @@ private fun LibraryContent(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val statuses = MediaStatus.entries
     val selectedStatus = statuses[selectedTab]
-    val allSortedItems = uiState.items.let { items ->
-        when (uiState.sortOption) {
-            SortOption.DATE_ADDED -> items.sortedByDescending { it.library.addedAt }
-            SortOption.TITLE -> items.sortedBy { it.media.title.lowercase() }
-            SortOption.RATING -> items.sortedByDescending { it.library.personalRating ?: 0 }
-        }
-    }
-    val statusItems = allSortedItems.filter { it.library.status == selectedStatus }
+    val statusItems = uiState.statusItems
 
     LaunchedEffect(selectedTab) {
         onStatusTabChanged(selectedStatus)
@@ -288,14 +281,7 @@ private fun LibraryContent(
                 .padding(innerPadding),
         ) {
             if (uiState.selectedSmartListId != null && uiState.selectedSmartListFilter != null) {
-                val filter = uiState.selectedSmartListFilter
-                val smartItems = uiState.items.filter { filter.matches(it) }.let { items ->
-                    when (uiState.sortOption) {
-                        SortOption.DATE_ADDED -> items.sortedByDescending { it.library.addedAt }
-                        SortOption.TITLE -> items.sortedBy { it.media.title.lowercase() }
-                        SortOption.RATING -> items.sortedByDescending { it.library.personalRating ?: 0 }
-                    }
-                }
+                val smartItems = uiState.smartListItems
                 SortBar(
                     selectedOption = uiState.sortOption,
                     onOptionSelected = onSortSelected,

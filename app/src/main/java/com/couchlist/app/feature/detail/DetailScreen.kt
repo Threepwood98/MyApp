@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -745,7 +746,7 @@ private fun RatingNotesDialog(
     onDismiss: () -> Unit,
     onConfirm: (rating: Int?, notes: String?) -> Unit,
 ) {
-    var sliderValue by remember { mutableStateOf(5f) }
+    var sliderValue by remember { mutableFloatStateOf(5f) }
     var notes by remember { mutableStateOf("") }
 
     AlertDialog(
@@ -891,7 +892,7 @@ private fun EditRatingDialog(
     onDismiss: () -> Unit,
     onConfirm: (rating: Int?) -> Unit,
 ) {
-    var sliderValue by remember { mutableStateOf((currentRating ?: 5).toFloat()) }
+    var sliderValue by remember { mutableFloatStateOf((currentRating ?: 5).toFloat()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -306,6 +306,8 @@ class ExportImportRepositoryImpl @Inject constructor(
         }
     }
 
+    // TODO(provider-delegation): Delegate path normalization to the provider registry when
+    //  a second metadata provider is added, so each provider owns its image URL construction.
     private fun normalizeArtworkUri(uri: String?): String? = when {
         uri == null -> null
         uri.startsWith("http://") || uri.startsWith("https://") -> uri

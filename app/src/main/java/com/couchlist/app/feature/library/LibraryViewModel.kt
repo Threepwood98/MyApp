@@ -40,7 +40,7 @@ class LibraryViewModel @Inject constructor(
                 repository.observeLibrary(),
                 repository.observeLists(),
             ) { items: List<LibraryMedia>, lists: List<MediaListSummary> ->
-                _uiState.value.copy(items = items, lists = lists)
+                _uiState.value.copy(items = items, lists = lists, isLoading = false)
             }.collect { _uiState.value = it }
         }
     }
@@ -69,8 +69,7 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onSelectAll() {
-        val status = _uiState.value.currentStatusTab
-        val items = getFilteredSortedItems().filter { it.library.status == status }
+        val items = _uiState.value.statusItems
         _uiState.update { it.copy(selectedIds = items.map { i -> i.media.id }.toSet()) }
     }
 
@@ -191,12 +190,7 @@ class LibraryViewModel @Inject constructor(
 
     fun getFilteredSortedItems(): List<LibraryMedia> {
         val state = _uiState.value
-        val items = state.items
-        return when (state.sortOption) {
-            SortOption.DATE_ADDED -> items.sortedByDescending { it.library.addedAt }
-            SortOption.TITLE -> items.sortedBy { it.media.title.lowercase() }
-            SortOption.RATING -> items.sortedByDescending { it.library.personalRating ?: 0 }
-        }
+        return state.sortedItems
     }
 }
 
@@ -209,7 +203,31 @@ data class LibraryUiState(
     val selectedIds: Set<Long> = emptySet(),
     val selectedSmartListId: Long? = null,
     val selectedSmartListFilter: SmartFilter? = null,
-)
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null,
+) {
+    val sortedItems: List<LibraryMedia>
+        get() = when (sortOption) {
+            SortOption.DATE_ADDED -> items.sortedByDescending { it.library.addedAt }
+            SortOption.TITLE -> items.sortedBy { it.media.title.lowercase() }
+            SortOption.RATING -> items.sortedByDescending { it.library.personalRating ?: 0 }
+        }
+
+    val smartListItems: List<LibraryMedia>
+        get() {
+            val filter = selectedSmartListFilter ?: return emptyList()
+            return items.filter { filter.matches(it) }.let { filtered ->
+                when (sortOption) {
+                    SortOption.DATE_ADDED -> filtered.sortedByDescending { it.library.addedAt }
+                    SortOption.TITLE -> filtered.sortedBy { it.media.title.lowercase() }
+                    SortOption.RATING -> filtered.sortedByDescending { it.library.personalRating ?: 0 }
+                }
+            }
+        }
+
+    val statusItems: List<LibraryMedia>
+        get() = sortedItems.filter { it.library.status == currentStatusTab }
+}
 
 enum class SortOption(val displayName: String) {
     DATE_ADDED("Date added"),

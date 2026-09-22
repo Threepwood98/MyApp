@@ -41,7 +41,7 @@ class ListsViewModel @Inject constructor(
         val lists = repository.observeLists()
         viewModelScope.launch {
             combine(lists, repository.observeGroups(), ::buildListsUiState)
-                .collect { state -> _uiState.update { state.copy(pileItems = it.pileItems) } }
+                .collect { state -> _uiState.update { state.copy(pileItems = it.pileItems, isLoading = false) } }
         }
         viewModelScope.launch {
             lists
@@ -177,6 +177,8 @@ data class ListsUiState(
     val groups: List<ListGroupSection> = emptyList(),
     val ungroupedLists: List<MediaListSummary> = emptyList(),
     val allLists: List<MediaListSummary> = emptyList(),
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null,
 )
 
 data class ListGroupSection(
