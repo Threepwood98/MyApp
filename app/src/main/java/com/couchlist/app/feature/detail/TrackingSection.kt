@@ -33,6 +33,7 @@ import com.couchlist.app.core.domain.model.TrackingMode
 import com.couchlist.app.core.domain.model.TrackingSession
 import com.couchlist.app.core.domain.model.TrackingState
 import com.couchlist.app.core.ui.components.MediaProgressRing
+import java.text.NumberFormat
 
 @Composable
 internal fun TrackingSection(
@@ -169,7 +170,7 @@ private fun TrackingHeader(session: TrackingSession) {
         session.progress?.let { progress ->
             MediaProgressRing(progress = progress) {
                 Text(
-                    "${(progress * 100).toInt()}%",
+                    NumberFormat.getPercentInstance().format(progress.coerceIn(0.0, 1.0)),
                     style = MaterialTheme.typography.labelSmall,
                 )
             }

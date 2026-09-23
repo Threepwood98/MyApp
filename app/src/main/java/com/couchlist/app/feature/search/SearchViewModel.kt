@@ -56,14 +56,20 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState
                 .map { it.query }
-                .debounce(400)
                 .distinctUntilChanged()
+                .debounce(400)
                 .collectLatest { query -> search(query) }
         }
     }
 
     fun onQueryChange(query: String) {
-        _uiState.update { it.copy(query = query, errorMessage = null) }
+        _uiState.update {
+            it.copy(
+                query = query,
+                isSearching = query.isNotBlank(),
+                errorMessage = null,
+            )
+        }
     }
 
     fun onRetry() {
@@ -106,31 +112,53 @@ class SearchViewModel @Inject constructor(
     }
 
     private suspend fun search(query: String) {
-        if (query.isBlank()) {
-            _uiState.update {
-                it.copy(results = emptyList(), isSearching = false, errorMessage = null)
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) {
+            _uiState.update { state ->
+                if (state.query.isBlank()) {
+                    state.copy(results = emptyList(), isSearching = false, errorMessage = null)
+                } else {
+                    state
+                }
             }
             return
         }
-        _uiState.update { it.copy(isSearching = true, errorMessage = null) }
-        catalogRepository.search(query.trim())
+        _uiState.update { state ->
+            if (state.query.trim() == normalizedQuery) {
+                state.copy(isSearching = true, errorMessage = null)
+            } else {
+                state
+            }
+        }
+        catalogRepository.search(normalizedQuery)
             .onSuccess { results ->
                 val references = results.map { it.reference }.toSet()
                 val foundInLibrary = libraryMediaReferences.value.intersect(references)
                 val foundInPile = pileMediaReferences.value.intersect(references)
-                _uiState.update {
-                    it.copy(
-                        results = results,
-                        inLibraryReferences = foundInLibrary,
-                        inPileReferences = foundInPile,
-                        isSearching = false,
-                        errorMessage = null,
-                    )
+                _uiState.update { state ->
+                    if (state.query.trim() == normalizedQuery) {
+                        state.copy(
+                            results = results,
+                            inLibraryReferences = foundInLibrary,
+                            inPileReferences = foundInPile,
+                            isSearching = false,
+                            errorMessage = null,
+                        )
+                    } else {
+                        state
+                    }
                 }
             }
             .onFailure { throwable ->
-                _uiState.update {
-                    it.copy(isSearching = false, errorMessage = networkErrorMessage(throwable))
+                _uiState.update { state ->
+                    if (state.query.trim() == normalizedQuery) {
+                        state.copy(
+                            isSearching = false,
+                            errorMessage = networkErrorMessage(throwable),
+                        )
+                    } else {
+                        state
+                    }
                 }
             }
     }

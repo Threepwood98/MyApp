@@ -54,7 +54,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.couchlist.app.BuildConfig
 import com.couchlist.app.core.domain.model.AppSettings
 import com.couchlist.app.core.domain.model.ThemeMode
+import com.couchlist.app.core.ui.components.SectionHeader
 import com.couchlist.app.core.ui.theme.CouchlistTheme
+import com.couchlist.app.core.ui.theme.spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,7 +163,13 @@ private fun SettingsContent(
                 .verticalScroll(rememberScrollState())
                 .padding(innerPadding),
         ) {
-            SectionHeader(text = "Appearance")
+            SectionHeader(
+                title = "Appearance",
+                modifier = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.large,
+                    vertical = MaterialTheme.spacing.small,
+                ),
+            )
             ListItem(
                 headlineContent = { Text(text = "Theme") },
                 supportingContent = {
@@ -195,7 +203,13 @@ private fun SettingsContent(
                 },
             )
             HorizontalDivider()
-            SectionHeader(text = "Streaming")
+            SectionHeader(
+                title = "Streaming",
+                modifier = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.large,
+                    vertical = MaterialTheme.spacing.small,
+                ),
+            )
             ListItem(
                 headlineContent = { Text(text = "Provider region") },
                 supportingContent = {
@@ -209,7 +223,13 @@ private fun SettingsContent(
                 },
             )
             HorizontalDivider()
-            SectionHeader(text = "Data")
+            SectionHeader(
+                title = "Data",
+                modifier = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.large,
+                    vertical = MaterialTheme.spacing.small,
+                ),
+            )
             ListItem(
                 headlineContent = { Text(text = "Export library") },
                 supportingContent = {
@@ -225,7 +245,13 @@ private fun SettingsContent(
                 modifier = Modifier.clickable { onImport() },
             )
             HorizontalDivider()
-            SectionHeader(text = "About")
+            SectionHeader(
+                title = "About",
+                modifier = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.large,
+                    vertical = MaterialTheme.spacing.small,
+                ),
+            )
             ListItem(
                 headlineContent = { Text(text = "Version") },
                 supportingContent = {
@@ -283,18 +309,6 @@ private fun RegionMenu(
             }
         }
     }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .semantics { heading() },
-    )
 }
 
 @Preview(showBackground = true)

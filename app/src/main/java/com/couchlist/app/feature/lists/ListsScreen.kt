@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,14 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -57,24 +53,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import coil3.compose.AsyncImage
 import com.couchlist.app.core.domain.model.LibraryMedia
 import com.couchlist.app.core.domain.model.ListGroup
 import com.couchlist.app.core.domain.model.MediaList
 import com.couchlist.app.core.domain.model.MediaListSummary
 import com.couchlist.app.core.domain.model.MediaListType
-import com.couchlist.app.core.ui.components.MediaProgressRing
-import com.couchlist.app.core.ui.components.MediaProgressRingSize
+import com.couchlist.app.core.ui.components.EmptyState
+import com.couchlist.app.core.ui.components.ErrorState
+import com.couchlist.app.core.ui.components.LibraryItemCard
+import com.couchlist.app.core.ui.components.ListCard as CouchlistListCard
+import com.couchlist.app.core.ui.components.LoadingState
+import com.couchlist.app.core.ui.components.MediaPoster
+import com.couchlist.app.core.ui.components.MediaProgressBadge
+import com.couchlist.app.core.ui.components.SectionHeader
+import com.couchlist.app.core.ui.theme.dimensions
+import com.couchlist.app.core.ui.theme.spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +81,6 @@ fun ListsRoute(
     onListClick: (Long) -> Unit,
     onItemClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
-    onDashboardClick: () -> Unit,
     onLibraryClick: () -> Unit,
     onStatisticsClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -121,33 +119,34 @@ fun ListsRoute(
                     }
                     Box {
                         IconButton(onClick = { overflowExpanded = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "More")
+                            Icon(Icons.Filled.MoreVert, contentDescription = "More destinations")
                         }
                         DropdownMenu(
                             expanded = overflowExpanded,
                             onDismissRequest = { overflowExpanded = false },
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Dashboard") },
-                                leadingIcon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                                onClick = { overflowExpanded = false; onDashboardClick() },
-                            )
-                            DropdownMenuItem(
                                 text = { Text("Library") },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
-                                onClick = { overflowExpanded = false; onLibraryClick() },
+                                leadingIcon = {
+                                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
+                                },
+                                onClick = {
+                                    overflowExpanded = false
+                                    onLibraryClick()
+                                },
                             )
                             DropdownMenuItem(
                                 text = { Text("Statistics") },
                                 leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
-                                onClick = { overflowExpanded = false; onStatisticsClick() },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Settings") },
-                                leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
-                                onClick = { overflowExpanded = false; onSettingsClick() },
+                                onClick = {
+                                    overflowExpanded = false
+                                    onStatisticsClick()
+                                },
                             )
                         }
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
             )
@@ -159,21 +158,34 @@ fun ListsRoute(
             }
         },
     ) { padding ->
-        ListsContent(
-            state = uiState,
-            onListClick = onListClick,
-            onItemClick = onItemClick,
-            onEditList = { editingList = it },
-            onDeleteList = { deletingList = it },
-            onDuplicateList = viewModel::duplicateList,
-            onTogglePinned = viewModel::togglePinned,
-            onSetGroup = { groupingList = it },
-            onMoveList = viewModel::moveList,
-            onEditGroup = { editingGroup = it },
-            onDeleteGroup = { deletingGroup = it },
-            onMoveGroup = viewModel::moveGroup,
-            modifier = Modifier.padding(padding),
-        )
+        val contentModifier = Modifier.padding(padding)
+        when {
+            uiState.isLoading -> LoadingState(modifier = contentModifier.fillMaxSize())
+            uiState.errorMessage != null -> ErrorState(
+                message = uiState.errorMessage.orEmpty(),
+                modifier = contentModifier.fillMaxSize(),
+            )
+            uiState.pile == null && uiState.allLists.isEmpty() -> EmptyState(
+                title = "Your library is ready",
+                message = "Create a list or save something interesting to get started.",
+                modifier = contentModifier.fillMaxSize(),
+            )
+            else -> ListsContent(
+                state = uiState,
+                onListClick = onListClick,
+                onItemClick = onItemClick,
+                onEditList = { editingList = it },
+                onDeleteList = { deletingList = it },
+                onDuplicateList = viewModel::duplicateList,
+                onTogglePinned = viewModel::togglePinned,
+                onSetGroup = { groupingList = it },
+                onMoveList = viewModel::moveList,
+                onEditGroup = { editingGroup = it },
+                onDeleteGroup = { deletingGroup = it },
+                onMoveGroup = viewModel::moveGroup,
+                modifier = contentModifier,
+            )
+        }
     }
 
     if (showAddSheet) {
@@ -371,63 +383,33 @@ private fun ListsContent(
 @Composable
 private fun EnjoyingShelf(items: List<LibraryMedia>, onItemClick: (Long) -> Unit) {
     Column {
-        SectionTitle("Enjoying")
+        SectionHeader(
+            title = "Enjoying",
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.large),
+        )
+        Spacer(Modifier.height(MaterialTheme.spacing.medium))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items, key = { it.library.id }) { item ->
-                Column(
-                    modifier = Modifier
-                        .width(112.dp)
-                        .clickable { onItemClick(item.media.id) },
-                ) {
-                    Card {
-                        Box {
-                            if (item.media.artworkUri != null) {
-                                AsyncImage(
-                                    model = item.media.artworkUri,
-                                    contentDescription = item.media.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(item.media.title.take(1), style = MaterialTheme.typography.headlineMedium)
-                                }
-                            }
-                            item.progress?.let { progress ->
-                                Surface(
-                                    shape = MaterialTheme.shapes.extraLarge,
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                                ) {
-                                    MediaProgressRing(
-                                        progress = progress,
-                                        size = MediaProgressRingSize.COMPACT,
-                                        modifier = Modifier.padding(3.dp),
-                                    )
-                                }
-                            }
+                LibraryItemCard(
+                    title = item.media.title,
+                    subtitle = item.tracking?.mode?.displayName,
+                    artworkModel = item.media.artworkUri,
+                    onClick = { onItemClick(item.media.id) },
+                    modifier = Modifier.width(MaterialTheme.dimensions.posterMediumWidth),
+                    artworkOverlay = item.progress?.let { progress ->
+                        {
+                            MediaProgressBadge(
+                                progress = progress,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(MaterialTheme.spacing.small),
+                            )
                         }
-                    }
-                    Text(
-                        item.media.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                    Text(
-                        item.tracking?.mode?.displayName.orEmpty(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
+                    },
+                )
             }
         }
     }
@@ -436,7 +418,11 @@ private fun EnjoyingShelf(items: List<LibraryMedia>, onItemClick: (Long) -> Unit
 @Composable
 private fun PileCard(summary: MediaListSummary, items: List<LibraryMedia>, onClick: () -> Unit) {
     Column {
-        SectionTitle("The Pile")
+        SectionHeader(
+            title = "The Pile",
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.large),
+        )
+        Spacer(Modifier.height(MaterialTheme.spacing.medium))
         ElevatedCard(
             modifier = Modifier
                 .padding(horizontal = 16.dp)
@@ -477,20 +463,12 @@ private fun PileCard(summary: MediaListSummary, items: List<LibraryMedia>, onCli
 
 @Composable
 private fun PosterThumb(item: LibraryMedia) {
-    Surface(shape = MaterialTheme.shapes.small, modifier = Modifier.width(72.dp)) {
-        if (item.media.artworkUri != null) {
-            AsyncImage(
-                model = item.media.artworkUri,
-                contentDescription = item.media.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.aspectRatio(2f / 3f),
-            )
-        } else {
-            Box(Modifier.aspectRatio(2f / 3f), contentAlignment = Alignment.Center) {
-                Text(item.media.title.take(1), style = MaterialTheme.typography.headlineSmall)
-            }
-        }
-    }
+    MediaPoster(
+        model = item.media.artworkUri,
+        contentDescription = null,
+        modifier = Modifier.width(MaterialTheme.dimensions.posterSmallWidth),
+        shape = MaterialTheme.shapes.small,
+    )
 }
 
 @Composable
@@ -508,17 +486,11 @@ private fun GroupShelf(
     onMoveGroup: (ListGroup, Int) -> Unit,
 ) {
     Column {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                section.group.name,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.weight(1f).semantics { heading() },
-            )
-            GroupMenu(section.group, onEditGroup, onDeleteGroup, onMoveGroup)
-        }
+        SectionHeader(
+            title = section.group.name,
+            modifier = Modifier.padding(start = MaterialTheme.spacing.large, end = MaterialTheme.spacing.small),
+            action = { GroupMenu(section.group, onEditGroup, onDeleteGroup, onMoveGroup) },
+        )
         if (section.lists.isEmpty()) {
             Text(
                 "No lists in this group yet",
@@ -554,7 +526,11 @@ private fun ListShelf(
     onMoveList: (MediaList, Int) -> Unit,
 ) {
     Column {
-        SectionTitle(title)
+        SectionHeader(
+            title = title,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.large),
+        )
+        Spacer(Modifier.height(MaterialTheme.spacing.medium))
         ListShelfContent(
             lists,
             onListClick,
@@ -612,28 +588,24 @@ private fun ListCard(
     onMoveDown: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    ElevatedCard(modifier = Modifier.width(168.dp).clickable(onClick = onClick)) {
-        Box {
-            if (summary.coverArtworkUri != null) {
-                AsyncImage(
-                    model = summary.coverArtworkUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f),
-                )
-            } else {
+    CouchlistListCard(
+        title = summary.list.name,
+        supportingText = "${summary.itemCount} ${if (summary.itemCount == 1) "item" else "items"} · ${summary.list.type.label}",
+        artworkModel = summary.coverArtworkUri,
+        onClick = onClick,
+        modifier = Modifier.width(168.dp),
+        artworkOverlay = {
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(36.dp))
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "Actions for ${summary.list.name}",
+                        )
                     }
-                }
-            }
-            Box(Modifier.align(Alignment.TopEnd)) {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "List actions")
                 }
                 DropdownMenu(menuExpanded, onDismissRequest = { menuExpanded = false }) {
                     fun dismiss(action: () -> Unit) { menuExpanded = false; action() }
@@ -649,17 +621,8 @@ private fun ListCard(
                     DropdownMenuItem(text = { Text("Delete") }, onClick = { dismiss(onDelete) })
                 }
             }
-        }
-        Column(Modifier.padding(12.dp)) {
-            Text(summary.list.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${summary.itemCount} ${if (summary.itemCount == 1) "item" else "items"} · ${summary.list.type.label}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -681,15 +644,6 @@ private fun GroupMenu(
             DropdownMenuItem(text = { Text("Delete") }, onClick = { expanded = false; onDelete(group) })
         }
     }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() },
-    )
 }
 
 @Composable

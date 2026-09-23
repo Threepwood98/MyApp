@@ -1,12 +1,15 @@
 package com.couchlist.app.core.ui.navigation
 
+import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -15,8 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -24,8 +26,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.couchlist.app.R
 import com.couchlist.app.feature.detail.DetailRoute as DetailScreen
-import com.couchlist.app.feature.home.HomeRoute
 import com.couchlist.app.feature.library.LibraryRoute as LibraryScreen
 import com.couchlist.app.feature.lists.ListDetailRoute as ListDetailScreen
 import com.couchlist.app.feature.lists.ListsRoute as ListsScreen
@@ -39,42 +41,31 @@ fun CouchlistNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
-    val destinations = listOf(
-        TopLevelDestination(ListsRoute, "Lists", Icons.AutoMirrored.Filled.List),
-        TopLevelDestination(SearchRoute, "Search", Icons.Filled.Search),
-        TopLevelDestination(LogbookRoute, "Logbook", Icons.Filled.DateRange),
-    )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
-    val showBottomBar = currentDestination == null || destinations.any {
-        currentDestination.matches(it.route)
+    val showBottomBar = currentDestination == null || TopLevelDestination.entries.any {
+        it.matches(currentDestination)
     }
 
     Scaffold(
         modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(tonalElevation = 0.dp) {
-                    destinations.forEach { destination ->
-                        val selected = currentDestination.matches(destination.route)
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                    TopLevelDestination.entries.forEach { destination ->
+                        val label = stringResource(destination.labelRes)
                         NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            selected = destination.matches(currentDestination),
+                            onClick = { destination.navigate(navController) },
                             icon = {
                                 Icon(
                                     imageVector = destination.icon,
-                                    contentDescription = destination.label,
+                                    contentDescription = null,
                                 )
                             },
-                            label = { Text(destination.label) },
+                            label = { Text(label) },
                         )
                     }
                 }
@@ -84,24 +75,18 @@ fun CouchlistNavHost(
         NavHost(
             navController = navController,
             startDestination = ListsRoute,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
         ) {
             composable<ListsRoute> {
                 ListsScreen(
                     onListClick = { listId -> navController.navigate(ListDetailRoute(listId)) },
                     onItemClick = { mediaId -> navController.navigate(DetailRoute(mediaId)) },
-                    onSearchClick = { navController.navigateTopLevel(SearchRoute) },
-                    onDashboardClick = { navController.navigate(HomeRoute) },
+                    onSearchClick = { TopLevelDestination.SEARCH.navigate(navController) },
                     onLibraryClick = { navController.navigate(LibraryRoute) },
                     onStatisticsClick = { navController.navigate(StatisticsRoute) },
                     onSettingsClick = { navController.navigate(SettingsRoute) },
-                )
-            }
-            composable<HomeRoute> {
-                HomeRoute(
-                    onSearchClick = { navController.navigateTopLevel(SearchRoute) },
-                    onSettingsClick = { navController.navigate(SettingsRoute) },
-                    onItemClick = { item -> navController.navigate(DetailRoute(item.media.id)) },
                 )
             }
             composable<SearchRoute> {
@@ -110,13 +95,13 @@ fun CouchlistNavHost(
                     onDetailClick = { mediaId -> navController.navigate(DetailRoute(mediaId)) },
                 )
             }
+            composable<LogbookRoute> {
+                LogbookScreen()
+            }
             composable<LibraryRoute> {
                 LibraryScreen(
                     onItemClick = { item -> navController.navigate(DetailRoute(item.media.id)) },
                 )
-            }
-            composable<LogbookRoute> {
-                LogbookScreen()
             }
             composable<StatisticsRoute> {
                 StatisticsScreen()
@@ -137,26 +122,33 @@ fun CouchlistNavHost(
     }
 }
 
-private fun NavHostController.navigateTopLevel(route: Any) {
-    navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+private enum class TopLevelDestination(
+    @param:StringRes val labelRes: Int,
+    val icon: ImageVector,
+) {
+    LISTS(R.string.navigation_lists, Icons.AutoMirrored.Filled.List),
+    SEARCH(R.string.navigation_search, Icons.Filled.Search),
+    LOGBOOK(R.string.navigation_logbook, Icons.Filled.DateRange),
+    ;
+
+    fun matches(destination: NavDestination?): Boolean = when (this) {
+        LISTS -> destination?.hasRoute<ListsRoute>() == true ||
+            destination?.hasRoute<LibraryRoute>() == true ||
+            destination?.hasRoute<StatisticsRoute>() == true
+        SEARCH -> destination?.hasRoute<SearchRoute>() == true
+        LOGBOOK -> destination?.hasRoute<LogbookRoute>() == true
+    }
+
+    fun navigate(navController: NavHostController) {
+        val route = when (this) {
+            LISTS -> ListsRoute
+            SEARCH -> SearchRoute
+            LOGBOOK -> LogbookRoute
+        }
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 }
-
-private fun NavDestination?.matches(route: Any): Boolean = when (route) {
-    ListsRoute -> this?.hasRoute<ListsRoute>() == true
-    HomeRoute -> this?.hasRoute<HomeRoute>() == true
-    SearchRoute -> this?.hasRoute<SearchRoute>() == true
-    LibraryRoute -> this?.hasRoute<LibraryRoute>() == true
-    LogbookRoute -> this?.hasRoute<LogbookRoute>() == true
-    StatisticsRoute -> this?.hasRoute<StatisticsRoute>() == true
-    else -> false
-}
-
-private data class TopLevelDestination(
-    val route: Any,
-    val label: String,
-    val icon: ImageVector,
-)

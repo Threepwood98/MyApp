@@ -1,1259 +1,1387 @@
-# MISIÓN
+# EVOLUTION_PLAN
 
-Actúa como un Senior Android Engineer + Software Architect + Product Designer
-especializado en Kotlin, Jetpack Compose, Material 3, Room, arquitectura
-offline-first y aplicaciones de catalogación multimedia.
+## 0. Propósito de este documento
 
-Vas a trabajar SOBRE MI PROYECTO EXISTENTE.
+Este archivo es la **fuente principal de verdad para la evolución de la
+aplicación**.
 
-Repositorio:
-https://github.com/Threepwood98/MyApp
+El proyecto se desarrolla en:
 
-El proyecto actualmente se llama Couchlist y comenzó como una aplicación para
-gestionar películas y series mediante TMDB.
-
-NO quiero crear un proyecto Android nuevo.
-NO quiero tirar el código existente y empezar desde cero.
-Quiero evolucionar progresivamente la arquitectura y UI existentes.
-
-============================================================
-OBJETIVO DEL PRODUCTO
-============================================================
-
-Quiero transformar Couchlist en una aplicación Android para organizar TODO mi
-entretenimiento y ocio personal.
-
-Debe permitirme registrar, organizar y hacer seguimiento de:
-
-- Películas
-- Series de TV
-- Anime
-- Libros
-- Manga
-- Comics / novelas gráficas
-- Videojuegos
+`https://github.com/Threepwood98/MyApp`
 
-La arquitectura debe permitir añadir posteriormente:
+La aplicación comenzó como Couchlist, centrada en películas y series
+mediante TMDB, y está evolucionando hacia una aplicación Android general
+para organizar, descubrir y hacer seguimiento del entretenimiento y ocio
+personal.
 
-- Podcasts
-- Música / álbumes
-- YouTube
-- Artículos
-- Board games
-- Apps
-- Elementos personalizados
-
-Quiero poder responder fácilmente preguntas como:
-
-"¿Qué tengo pendiente?"
-"¿Qué estoy viendo?"
-"¿Qué estoy leyendo?"
-"¿Qué estoy jugando?"
-"¿Por qué episodio voy?"
-"¿Qué terminé este año?"
-"¿Qué juegos he abandonado?"
-"¿Qué manga estoy leyendo?"
-"¿Qué quiero ver después?"
-"¿Quién me recomendó esto?"
-"¿Qué valoración le puse?"
-"¿Cuándo terminé este juego?"
-
-La inspiración principal de UX y producto es Sofa:
-
-https://www.sofahq.com/
-https://www.sofahq.com/organize
-https://www.sofahq.com/track
-https://www.sofahq.com/features
+### Estado histórico del proyecto
 
-Las screenshots de Sofa proporcionadas junto con esta tarea son REFERENCIAS
-VISUALES IMPORTANTES.
+A efectos de este roadmap:
 
-Estúdialas antes de modificar la UI.
+-   **Phase 0 --- Audit / planning:** completada.
+-   **Phase 1 --- Generic Library domain / desacoplamiento inicial de
+    TMDB:** completada.
+-   **Phase 2 --- Lists / Groups / The Pile:** completada.
+-   **Phase 3 --- Generic Tracking / Enjoying / Progress:** completada.
+-   El código real del repositorio puede contener además partes de
+    funcionalidades que originalmente estaban previstas para fases
+    posteriores.
+-   Antes de modificar una feature existente hay que inspeccionar su
+    implementación real. No asumir que el número de fase describe
+    perfectamente el estado del código.
 
-IMPORTANTE:
+### Cambio de estrategia
 
-No quiero una copia ciega de iOS.
+A partir de este punto el desarrollo pasa a ser **UI-FIRST**.
 
-Quiero:
-
-SOFA COMO MODELO DE PRODUCTO
-+
-MATERIAL 3 COMO LENGUAJE NATIVO DE ANDROID.
-
-Conserva la filosofía, organización, densidad visual, cards, carátulas,
-progreso, listas y facilidad de uso de Sofa, pero implementadas siguiendo
-patrones Android modernos.
-
-No copies assets, iconos propietarios, branding, textos distintivos ni código
-de Sofa.
-
-============================================================
-0. ANTES DE ESCRIBIR CÓDIGO
-   ============================================================
-
-NO empieces modificando archivos inmediatamente.
-
-Primero inspecciona TODO el repositorio.
-
-Analiza como mínimo:
-
-- settings.gradle.kts
-- build.gradle.kts
-- app/build.gradle.kts
-- AndroidManifest.xml
-- core/
-- core/data/
-- core/data/local/
-- core/data/remote/
-- core/data/repository/
-- core/domain/
-- core/ui/
-- feature/home/
-- feature/search/
-- feature/detail/
-- feature/settings/
-- navegación
-- modelos Room
-- DAOs
-- repositorios
-- ViewModels
-- componentes Compose
-- Theme
-- integración TMDB
-
-Identifica qué existe realmente.
-
-NO supongas que el README está completamente actualizado.
-
-Después crea:
-
-docs/SOFA_EVOLUTION_PLAN.md
-
-Debe contener:
-
-1. arquitectura actual
-2. funcionalidades existentes
-3. deuda técnica relevante
-4. componentes reutilizables
-5. componentes que necesitan generalización
-6. nuevo modelo de dominio
-7. cambios Room/migraciones
-8. nueva navegación
-9. fuentes de datos necesarias
-10. fases de implementación
-11. riesgos
-12. decisiones técnicas
-
-Después comienza la implementación.
+La prioridad inmediata NO es seguir añadiendo lógica, APIs o tablas.
 
-NO esperes confirmación entre pequeños pasos salvo que encuentres una decisión
-que pueda provocar pérdida de datos o requiera secretos/API keys que no están
-disponibles.
+La prioridad es construir primero la experiencia visual y de interacción
+completa que queremos para la aplicación, utilizando datos mock/sample
+cuando sea conveniente. Después conectaremos esa interfaz con el
+dominio, Room, repositorios y proveedores reales.
 
-============================================================
-1. PRINCIPIO FUNDAMENTAL DEL DOMINIO
-   ============================================================
+La UI actual **no es sagrada**.
 
-El error que debemos evitar es modelar toda la aplicación alrededor de TMDB.
+Si una pantalla, navegación, componente Compose o estructura visual
+existente dificulta alcanzar la experiencia objetivo:
 
-TMDB es UNA fuente de metadatos.
+-   puede refactorizarse profundamente;
+-   puede reemplazarse;
+-   puede reconstruirse desde cero.
 
-NO es nuestro dominio.
+Esto NO significa recrear innecesariamente todo el proyecto Android.
+Kotlin, Jetpack Compose, Material 3, Hilt, Room, Retrofit, Coil,
+Navigation y la arquitectura útil existente deben conservarse cuando
+aporten valor.
 
-Actualmente MediaItem/MediaDetail/WatchStatus probablemente están demasiado
-ligados a Movie/TV.
+### AGENTS.md
 
-Refactoriza progresivamente hacia un dominio genérico.
+**AGENTS.md ya no existe y no forma parte del flujo del proyecto.**
 
-Conceptualmente quiero algo parecido a:
+No lo busques. No lo recrees automáticamente. No dependas de
+instrucciones externas en AGENTS.md.
 
-LibraryItem
-id
-category
-source
-externalId
-title
-subtitle
-description
-artwork
-backdrop
-releaseDate
-dateAdded
-metadata
-userData
+Este `EVOLUTION_PLAN.md`, el código real y las referencias visuales
+proporcionadas son la guía de implementación.
 
-MediaCategory:
-MOVIE
-TV_SHOW
-ANIME
-BOOK
-MANGA
-COMIC
-VIDEO_GAME
-PODCAST
-MUSIC
-CUSTOM
+------------------------------------------------------------------------
 
-NO es obligatorio usar exactamente estos nombres.
+# 1. MISIÓN
 
-Diseña el modelo adecuado después de estudiar el código.
+Actúa como:
 
-Muy importante:
+-   Senior Android Engineer
+-   Software Architect
+-   Product Designer especializado en Android
+-   especialista en Kotlin, Jetpack Compose, Material 3, Room y
+    aplicaciones offline-first
 
-No crees una mega tabla absurda con 50 columnas nullable para acomodar todas
-las categorías.
+Trabaja SOBRE el proyecto existente.
 
-Usa una arquitectura que permita:
+No crees otro proyecto Android salvo que exista una razón técnica
+extraordinaria y explícitamente justificada.
 
-- propiedades comunes
-- metadata específica por categoría
-- tracking independiente
-- proveedores externos independientes
+El objetivo es convertir la aplicación en una experiencia Android de
+alta calidad inspirada conceptualmente en Sofa, pero diseñada de forma
+nativa para Android.
 
-La UI nunca debería necesitar saber si un Movie vino de TMDB o de otra API.
+------------------------------------------------------------------------
 
-============================================================
-2. SOURCE ADAPTERS / PROVIDERS
-   ============================================================
+# 2. OBJETIVO DEL PRODUCTO
 
-Crea una abstracción de fuentes externas.
+La aplicación debe permitir organizar y hacer seguimiento de:
 
-Por ejemplo conceptualmente:
+-   Películas
+-   Series de TV
+-   Anime
+-   Libros
+-   Manga
+-   Comics / novelas gráficas
+-   Videojuegos
+
+La arquitectura y la UI deben permitir añadir posteriormente:
+
+-   Podcasts
+-   Audiobooks
+-   Música / álbumes
+-   YouTube
+-   Artículos
+-   Board games
+-   Apps
+-   Custom items
+
+Debe ser posible responder fácilmente preguntas como:
+
+-   ¿Qué tengo pendiente?
+-   ¿Qué estoy viendo?
+-   ¿Qué estoy leyendo?
+-   ¿Qué estoy jugando?
+-   ¿Por qué episodio voy?
+-   ¿Cuál es mi siguiente episodio?
+-   ¿Qué terminé este año?
+-   ¿Qué juegos abandoné?
+-   ¿Qué manga estoy leyendo?
+-   ¿Qué quiero ver después?
+-   ¿Quién me recomendó esto?
+-   ¿Qué valoración le puse?
+-   ¿Cuándo empecé o terminé algo?
+-   ¿Qué he estado disfrutando últimamente?
+
+La aplicación debe servir tanto a un usuario casual como a uno avanzado.
+
+El flujo básico debe seguir siendo sencillo:
+
+`buscar → añadir → disfrutar → registrar progreso → terminar`
+
+La complejidad avanzada debe aparecer progresivamente.
+
+------------------------------------------------------------------------
+
+# 3. REFERENCIA DE PRODUCTO Y DISEÑO
+
+La inspiración principal es Sofa.
+
+Referencias:
+
+-   Sofa Lists / Library
+-   The Pile
+-   Enjoying
+-   Tracking modes
+-   TV season / episode tracking
+-   Planner
+-   Logbook
+-   Smart Lists
+-   Ingredients
+-   List layouts
+-   Item Detail
+
+Las screenshots proporcionadas con el proyecto son **referencias
+visuales prioritarias**.
+
+Antes de construir o rediseñar una pantalla relacionada, estudiarlas.
+
+## Principio
+
+**SOFA COMO MODELO DE PRODUCTO + MATERIAL 3 COMO LENGUAJE NATIVO DE
+ANDROID**
+
+No crear un clon pixel-perfect de iOS.
+
+Conservar de Sofa:
+
+-   jerarquía clara;
+-   fuerte uso de artwork;
+-   densidad de información;
+-   cards;
+-   agrupación;
+-   progresos visibles;
+-   acceso rápido a acciones;
+-   navegación simple;
+-   organización flexible;
+-   sensación calmada/cozy;
+-   presentación visual de listas;
+-   tracking que se adapta al contenido.
+
+Adaptar a Android:
+
+-   Material 3;
+-   NavigationBar / NavigationRail;
+-   TopAppBar;
+-   SearchBar;
+-   ModalBottomSheet;
+-   DropdownMenu;
+-   FilterChip / AssistChip;
+-   FAB cuando tenga sentido;
+-   Snackbar;
+-   edge-to-edge;
+-   predictive back;
+-   dynamic color;
+-   adaptive layouts.
 
-MediaMetadataProvider
-SearchProvider
-MetadataProvider
+No copiar:
 
-o una solución equivalente mejor adaptada al proyecto.
+-   branding de Sofa;
+-   assets propietarios;
+-   textos distintivos;
+-   código;
+-   Liquid Glass;
+-   controles Cupertino;
+-   chrome de iPhone;
+-   una TabBar iOS calcada.
 
-Queremos poder conectar progresivamente:
+------------------------------------------------------------------------
 
-Movies / TV:
-TMDB (ya existe)
+# 4. PRINCIPIO UI-FIRST
 
-Anime / Manga:
-AniList como primera opción
+A partir de Phase 4, el orden de trabajo es:
 
-Books:
-Google Books u Open Library
+1.  diseñar la experiencia;
+2.  implementarla en Compose;
+3.  hacerla navegable;
+4.  alimentarla con sample/mock data;
+5.  revisar visualmente;
+6.  estabilizar el contrato UI;
+7.  solo después conectar lógica y persistencia reales.
 
-Games:
-IGDB, RAWG u otra fuente apropiada
+Durante la etapa UI Prototype:
 
-Comics:
-arquitectura preparada para ComicVine u otro proveedor
+-   una pantalla puede usar fake repositories;
+-   puede usar fixtures;
+-   puede usar preview/sample models;
+-   no debe diseñarse alrededor de limitaciones accidentales del esquema
+    Room actual;
+-   no debe bloquearse porque una API futura aún no esté integrada.
 
-NO integres cinco APIs simultáneamente si eso pone en peligro el proyecto.
+El prototipo NO debe convertirse en código desechable de baja calidad.
 
-Primero desacopla TMDB del dominio.
+Los componentes visuales creados durante esta etapa deben poder
+reutilizarse cuando llegue la lógica real.
 
-Después incorpora categorías gradualmente.
+## Regla de reconstrucción
 
-Las API keys nunca deben estar hardcoded ni committed.
+Preservar arquitectura útil.
 
-============================================================
-3. MODELO MENTAL DE LA APP
-   ============================================================
+Preservar UI **solo si sirve al diseño objetivo**.
 
-La aplicación debe dejar de ser:
+Está permitido reemplazar por completo:
 
-Watchlist -> Watching -> Watched
+-   Home;
+-   Lists;
+-   Detail;
+-   Search;
+-   Tracking UI;
+-   Navigation shell;
+-   cards;
+-   list rows;
+-   sheets;
+-   dialogs;
+-   empty states;
+-   componentes visuales existentes.
 
-como estructura principal.
+No conservar una pantalla simplemente porque ya existe.
 
-Eso debe convertirse en ESTADO/PROGRESO del item.
+------------------------------------------------------------------------
 
-La estructura principal será:
+# 5. POLÍTICA DE BASE DE DATOS PRE-RELEASE
 
+Actualmente no hay usuarios de producción ni datos que debamos
+preservar.
+
+Por tanto, durante el desarrollo pre-release:
+
+-   los datos locales son desechables;
+-   Room puede rediseñarse libremente;
+-   se pueden eliminar tablas;
+-   se pueden renombrar tablas;
+-   se pueden recrear relaciones;
+-   se puede incrementar la versión sin conservar esquemas
+    experimentales;
+-   se puede borrar la base de datos de desarrollo;
+-   se puede usar recreación destructiva cuando sea apropiado para
+    builds de desarrollo;
+-   NO hay que invertir tiempo en migrar datos de versiones
+    experimentales anteriores.
+
+### Objetivo
+
+Preferir un esquema final limpio y coherente frente a mantener
+compatibilidad con decisiones experimentales.
+
+### Importante
+
+Esta libertad es TEMPORAL.
+
+Antes de la primera beta/release cuyos datos queramos conservar se
+declarará:
+
+## DATABASE STABILITY BASELINE
+
+A partir de ese punto:
+
+-   destructive migration queda prohibida;
+-   las migraciones Room explícitas pasan a ser obligatorias;
+-   los tests de migración pasan a ser obligatorios;
+-   no se podrán eliminar datos del usuario por cambios de esquema.
+
+Hasta entonces, **no crear trabajo artificial de migraciones**.
+
+------------------------------------------------------------------------
+
+# 6. AUDITORÍA ANTES DE CADA FASE
+
+Antes de modificar código de una fase:
+
+1.  inspeccionar el repositorio real;
+2.  leer este archivo;
+3.  revisar `git status`;
+4.  revisar las features y componentes afectados;
+5.  identificar qué ya existe;
+6.  comprobar si el README está desactualizado;
+7.  determinar qué conservar, refactorizar o reemplazar.
+
+No asumir que una feature falta porque el roadmap antiguo decía que
+pertenecía a una fase posterior.
+
+No asumir que una feature está terminada porque exista una clase con su
+nombre.
+
+El código es la fuente de verdad sobre el estado técnico.
+
+------------------------------------------------------------------------
+
+# 7. MODELO MENTAL DE LA APP
+
+La estructura principal NO debe ser:
+
+`Watchlist → Watching → Watched`
+
+Esos conceptos pertenecen al estado o tracking.
+
+La estructura conceptual es:
+
+``` text
 LIBRARY
-|
-+-- Lists
-|     +-- The Pile
-|     +-- Watching
-|     +-- Reading
-|     +-- Playing
-|     +-- Movies To Watch
-|     +-- Books To Read
-|     +-- etc.
-|
-+-- Smart Lists
-|
-+-- Tracking
-|
-+-- Logbook
+│
+├── The Pile
+│
+├── Enjoying
+│
+├── Lists
+│   ├── Groups
+│   ├── Regular Lists
+│   └── Smart Lists
+│
+├── Tracking
+│
+├── Planner
+│
+└── Logbook
+```
 
-Un mismo item puede estar asociado a listas y además tener un estado de
-tracking.
+Un mismo item puede:
 
-No acoples lista = estado.
+-   existir una sola vez en Library;
+-   pertenecer a cero, una o varias listas;
+-   estar en The Pile;
+-   tener tracking activo;
+-   aparecer automáticamente en Enjoying;
+-   generar eventos de Logbook;
+-   tener Ingredients;
+-   tener Notes.
 
-============================================================
-4. NAVEGACIÓN PRINCIPAL ANDROID
-   ============================================================
+**Lista != estado != tracking != historial.**
 
-En teléfonos usa NavigationBar Material 3.
+------------------------------------------------------------------------
 
-Destinos iniciales:
+# 8. NAVEGACIÓN OBJETIVO
 
-LISTS
-SEARCH
-LOGBOOK
+## Teléfono
 
-Deja arquitectura preparada para:
+La navegación principal debe estar optimizada para Android y para las
+acciones más frecuentes.
 
-PLANNER
-PROFILE / SETTINGS
+Objetivo conceptual:
 
-No copies literalmente la TabBar de iOS.
+-   Lists
+-   Enjoying o acceso equivalente de primer nivel cuando la UX lo
+    justifique
+-   Planner
+-   Logbook
+-   Search accesible de forma prominente
 
-En tablets/foldables usa diseño adaptativo:
+No copiar literalmente la distribución de tabs de Sofa.
 
-NavigationRail o panel lateral
-+
-contenido maestro/detalle cuando sea apropiado.
+La decisión final debe tomarse durante Phase 4 evaluando:
 
-Usa WindowSizeClass / adaptive navigation cuando tenga sentido.
+-   frecuencia de uso;
+-   espacio disponible;
+-   Material 3;
+-   claridad;
+-   screenshots de referencia.
+
+## Tablet / Foldable
+
+Preparar posteriormente:
+
+-   NavigationRail;
+-   list-detail;
+-   panes adaptativos;
+-   master/detail;
+-   layouts que aprovechen ancho.
 
-============================================================
-5. HOME / LISTS
-   ============================================================
+No escalar simplemente la UI de teléfono.
 
-La pantalla principal debe inspirarse fuertemente en las screenshots de Sofa.
+------------------------------------------------------------------------
 
-Quiero una experiencia visual basada en CARÁTULAS.
+# 9. DESIGN SYSTEM
 
-Parte superior:
+Antes de reconstruir las pantallas principales crear una base visual
+coherente.
 
-"The Pile"
+Centralizar:
 
-Debe ser un inbox rápido donde guardar algo antes de decidir en qué lista
-organizarlo.
+-   spacing;
+-   shapes;
+-   radii;
+-   elevation;
+-   typography;
+-   icon sizes;
+-   touch targets;
+-   poster dimensions;
+-   backdrop dimensions;
+-   list row dimensions;
+-   card padding;
+-   section spacing;
+-   progress visuals.
 
-Debajo:
+No dispersar números mágicos por Composables.
 
-"Enjoying" / "En progreso"
+## Objetivo visual
 
-Debe mostrar automáticamente cosas que estoy:
+La app debe sentirse:
 
-- viendo
-- leyendo
-- jugando
+-   cozy;
+-   media-first;
+-   limpia;
+-   calmada;
+-   visual;
+-   moderna;
+-   táctil;
+-   densa sin resultar agobiante;
+-   consistente;
+-   claramente Android.
 
-Ejemplos:
+## Artwork
 
-TV:
-poster + progreso + siguiente episodio
+Poster/cover típico:
 
-Book/Manga:
-cover + progreso
+`2:3`
 
-Game:
-cover + estado "Playing"
+Backdrop/episode still:
 
-Después:
+`16:9`
 
-listas fijadas / favoritas
+Permitir otras proporciones cuando una categoría lo requiera.
 
-y finalmente:
+## Themes
 
-Library / resto de listas.
+Soportar:
 
-Las listas deben soportar grupos.
+-   light;
+-   dark;
+-   system;
+-   dynamic color cuando esté disponible;
+-   paleta fallback cuidada.
 
-============================================================
-6. LISTAS
-   ============================================================
+Las referencias de Sofa pueden inspirar superficies, jerarquía y ritmo,
+pero los colores no deben estar hardcodeados para imitar iOS.
 
-Implementa entidades reales para:
+------------------------------------------------------------------------
 
-MediaList
-ListGroup
-MediaListItem / relación equivalente
+# 10. COMPONENTES VISUALES BASE
 
-Una lista NO debe duplicar el objeto multimedia.
+Crear/revisar componentes reutilizables como:
 
-Debe guardar relaciones hacia LibraryItem.
+-   `MediaArtwork`
+-   `MediaPoster`
+-   `MediaBackdrop`
+-   `MediaProgressRing`
+-   `LibraryItemRow`
+-   `LibraryItemCard`
+-   `ListCard`
+-   `PilePreview`
+-   `EnjoyingPreview`
+-   `SectionHeader`
+-   `MetadataRow`
+-   `TrackingSummaryCard`
+-   `UpNextCard`
+-   `SeasonCard`
+-   `EpisodeCard`
+-   `EmptyState`
+-   `ErrorState`
+-   `LoadingState`
+-   `CategoryIcon`
+-   `StatusChip`
+-   `FilterChipRow`
 
-Tipos:
+Los nombres exactos pueden variar.
 
-TODO
-COLLECTION
+No crear componentes gigantes con decenas de flags booleanos.
 
-TODO:
-elementos terminados pueden ocultarse automáticamente.
+Preferir composición.
 
-COLLECTION:
-elementos terminados permanecen visibles.
+------------------------------------------------------------------------
 
-Ejemplos:
+# 11. MEDIA PROGRESS RING
 
-Movies To Watch
-Books To Read
-Anime Backlog
-Playing
-Favorites
-Best Horror Movies
-Comics
-etc.
+Debe existir un componente reusable equivalente a:
 
-Añadir:
-
-- crear
-- editar
-- borrar
-- duplicar
-- reordenar
-- pin/unpin
-- mover entre grupos
-- multi-select
-- mover items
-- copiar items
-- quitar items
-
-============================================================
-7. LAYOUTS DE LISTAS
-   ============================================================
-
-Inspirándonos en Sofa, soportar progresivamente:
-
-LIST
-SMALL_GRID
-LARGE_GRID
-DATA_CARDS
-
-Los layouts deben reutilizar componentes.
-
-No dupliques toda la pantalla para cada layout.
-
-Persistir configuración por lista:
-
-layout
-sort
-group
-filters
-showLabels
-etc.
-
-============================================================
-8. DETALLE DEL ITEM
-   ============================================================
-
-Crear una pantalla MediaDetail reutilizable.
-
-Estructura aproximada:
-
-TopAppBar
-Hero artwork / backdrop
-Título
-Metadata básica
-Progreso
-Acciones principales
-
-Después secciones:
-
-Tracking
-Description
-Metadata
-Personal fields / Ingredients
-Where to watch (cuando aplique)
-Notes
-History / Logbook
-
-La información cambia según categoría.
-
-MOVIE:
-year, runtime, genres, director, providers
-
-TV:
-seasons, episodes, network, status, providers
-
-BOOK:
-author, pages, publisher
-
-MANGA:
-chapters, volumes, status
-
-GAME:
-platforms, developer, release date
-
-etc.
-
-No hagas una DetailScreen gigante llena de:
-
-if (type == MOVIE)
-else if (type == BOOK)
-...
-
-Crea componentes específicos de categoría y componentes comunes.
-
-============================================================
-9. PROGRESS TRACKING
-   ============================================================
-
-Esta es una funcionalidad CENTRAL.
-
-Implementa un sistema genérico inspirado en los cinco tracking modes de Sofa.
-
-TrackingMode:
-
-JUST_ENJOYING
-QUICK_LOG
-SIMPLE_COUNTER
-CHECKLIST
-JOURNAL
-
-A) JUST_ENJOYING
-
-Solo:
-
-Started date
-Started time
-"Currently enjoying"
-Mark as Done
-
-Perfecto para juegos o películas cuando no quiero microgestionar progreso.
-
-B) QUICK_LOG
-
-Cada pulsación crea:
-
-timestamp
-opcionalmente note
-
-Ideal para registrar sesiones/replays.
-
-C) SIMPLE_COUNTER
-
-current
-total
-unit
-
-Ejemplos:
-
-Book:
-234 / 600 pages
-
-Manga:
-57 / 120 chapters
-
-Comic:
-14 / 30 issues
-
-Game:
-32 / 50 milestones
-
-Mostrar progress ring.
-
-D) CHECKLIST
-
-Lista de checkpoints marcables.
-
-TV:
-Season -> Episodes
-
-Book:
-chapters
-
-Manga:
-chapters/volumes
-
-Custom:
-checkpoints creados por usuario
-
-E) JOURNAL
-
-Entradas:
-
-title
-date/time
-notes
-opcional imageUri
-
-Ideal para juegos.
-
-Ejemplo:
-
-"Reached Act II"
-"Defeated boss X"
-"Finished main story"
-
-============================================================
-10. TV TRACKING
-    ============================================================
-
-TV necesita tratamiento especial.
-
-Al comenzar una serie:
-
-obtener seasons/episodes desde TMDB.
-
-Guardar localmente lo necesario para permitir tracking offline.
-
-Mostrar:
-
-Season 1
-Season 2
-...
-
-Dentro:
-
-Episode thumbnail
-SxEy
-title
-air date
-runtime
-watched checkbox
-
-Funciones:
-
-Mark episode watched
-Mark episode unwatched
-Mark entire season watched
-Mark all up to this episode
-Set watched date
-
-Calcular:
-
-watchedEpisodes / totalEpisodes
-
-y mostrar ProgressRing.
-
-HOME debe mostrar:
-
-UP NEXT
-
-con el siguiente episodio no visto.
-
-No contar specials por defecto.
-
-Añadir setting:
-
-Include specials.
-
-============================================================
-11. ANIME
-    ============================================================
-
-Anime debe tener semántica propia aunque pueda compartir UI con TV.
-
-Preparar:
-
-episodes
-status
-season/year
-studio
-genres
-AniList id
-
-El usuario debe poder tener:
-
-Plan to Watch
-Watching
-Completed
-Paused
-Dropped
-
-NO obligues a Anime a convertirse en TMDB TV internamente.
-
-============================================================
-12. BOOK / MANGA / COMIC TRACKING
-    ============================================================
-
-BOOK:
-
-tracking configurable por:
-
-pages
-chapters
-simple completion
-
-MANGA:
-
-chapters
-volumes
-
-COMIC:
-
-issues
-volumes
-
-No asumir que todos los proveedores conocen el total.
-
-Permitir total = null.
-
-============================================================
-13. VIDEO GAMES
-    ============================================================
-
-Estados:
-
-BACKLOG
-PLAYING
-PAUSED
-COMPLETED
-DROPPED
-
-Tracking modes especialmente útiles:
-
-Just Enjoying
-Quick Log
-Simple Counter
-Journal
-
-Permitir plataforma:
-
-PC
-PS5
-Xbox
-Switch
-etc.
-
-Un mismo juego podría eventualmente tener múltiples playthroughs.
-
-No bloquees esa posibilidad en el esquema.
-
-============================================================
-14. LOGBOOK
-    ============================================================
-
-Crear historial central.
-
-LogEntry:
-
-id
-libraryItemId
-timestamp
-eventType
-trackingSessionId
-optionalNote
-metadata
-
-Ejemplos:
-
-STARTED
-COMPLETED
-EPISODE_WATCHED
-PROGRESS_CHANGED
-QUICK_LOG
-JOURNAL_ENTRY
-REWATCHED
-REREAD
-REPLAYED
-
-Pantalla:
-
-Today
-Yesterday
-This Week
-Earlier
-
-y filtros:
-
-Movies
-TV
-Anime
-Books
-Manga
-Comics
-Games
-
-El Logbook NO debe ser la fuente de verdad del estado actual.
-
-Debe ser historial.
-
-============================================================
-15. INGREDIENTS / CUSTOM FIELDS
-    ============================================================
-
-Implementa una versión Android/genérica del concepto "Ingredients".
-
-Nombre interno sugerido:
-
-CustomFieldDefinition
-CustomFieldValue
-
-Tipos:
-
-TEXT
-NUMBER
-DATE
-URL
-BOOLEAN
-SINGLE_SELECT
-MULTI_SELECT
-RATING
-
-Ejemplos:
-
-Rating:
-❤️ / 👍 / 👎
-
-Recommended By:
-John
-
-Tags:
-Family
-Kimmy
-Relaxing
-
-Priority:
-High / Medium / Low
-
-Owned:
-true/false
-
-Custom fields pueden asociarse a:
-
-todas las categorías
-o categorías concretas.
-
-Esto debe integrarse con Smart Lists.
-
-============================================================
-16. SMART LISTS
-    ============================================================
-
-Una Smart List no guarda manualmente sus items.
-
-Guarda reglas.
-
-Ejemplos:
-
-"Anime que estoy viendo"
-
-category == ANIME
-AND trackingStatus == IN_PROGRESS
-
-"Juegos pendientes de Switch"
-
-category == GAME
-AND platform contains SWITCH
-AND status == BACKLOG
-
-"Películas pendientes recomendadas por John"
-
-category == MOVIE
-AND completed == false
-AND RecommendedBy == John
-
-Crear:
-
-SmartList
-SmartListRule
-RuleOperator
-
-Operadores:
-
-EQUALS
-NOT_EQUALS
-CONTAINS
-NOT_CONTAINS
-GREATER_THAN
-LESS_THAN
-BEFORE
-AFTER
-IS_EMPTY
-IS_NOT_EMPTY
-
-Las Smart Lists deben actualizarse automáticamente cuando cambien los datos.
-
-No implementes inicialmente AI Smart Lists.
-Primero haz un motor determinista sólido.
-
-============================================================
-17. SEARCH / DISCOVERY
-    ============================================================
-
-La búsqueda debe ser GLOBAL.
-
-SearchBar Material 3.
-
-Filtros/chips:
-
-All
-Movies
-TV
-Anime
-Books
-Manga
-Comics
-Games
-
-Los resultados de distintas APIs deben convertirse a un modelo común:
-
-SearchResult
-
-pero conservar:
-
-source
-externalId
-
-Al seleccionar un resultado:
-
-1. obtener detalle
-2. mostrar preview/detail
-3. elegir:
-    - Add to The Pile
-    - Add to list
-    - Start Tracking
-
-Evitar duplicados usando:
-
-source + externalId
-
-y heurísticas secundarias solo cuando sea necesario.
-
-============================================================
-18. OFFLINE FIRST
-    ============================================================
-
-Mantén y amplía el principio offline-first existente.
-
-Room es la fuente local principal.
-
-El usuario debe poder SIN INTERNET:
-
-- abrir Library
-- abrir Lists
-- ver items guardados
-- ver metadata cacheada
-- cambiar progreso
-- marcar episodios
-- escribir journal entries
-- consultar Logbook
-- reorganizar listas
-
-Internet solo debe ser imprescindible para:
-
-- búsqueda remota
-- metadata nueva
-- refresh
-- imágenes no cacheadas
-
-Diseña las mutaciones para poder añadir cloud sync posteriormente.
-
-============================================================
-19. ROOM Y MIGRACIONES
-    ============================================================
-
-MUY IMPORTANTE:
-
-NO uses fallbackToDestructiveMigration.
-
-NO destruyas los datos existentes.
-
-Crea migraciones Room explícitas.
-
-Los elementos existentes de Couchlist deben convertirse a LibraryItem.
-
-Mapear:
-
-Watchlist -> lista "Movies & TV To Watch" o estado backlog
-Watching -> tracking IN_PROGRESS
-Watched -> completed + Logbook
-
-Preserva:
-
-TMDB id
-title
-poster
-backdrop
-overview
-status
-timestamps existentes
-
-Escribe tests de migración cuando sea viable.
-
-============================================================
-20. UI / DESIGN SYSTEM
-    ============================================================
-
-Objetivo visual:
-
-cozy
-media-first
-clean
-playful
-calm
-high information density
-excellent cover art
-
-Inspiración: screenshots de Sofa.
-
-Pero Android-native.
-
-Usar:
-
-MaterialTheme
-Material 3
-dynamic color
-system dark/light
-edge-to-edge
-predictive back
-NavigationBar
-NavigationRail
-TopAppBar
-SearchBar
-ModalBottomSheet
-DropdownMenu
-FilterChip
-AssistChip
-FloatingActionButton
-Snackbar
-pull-to-refresh cuando corresponda
-
-Evitar copiar:
-
-- Liquid Glass
-- barras flotantes idénticas a iOS
-- navigation chrome de iPhone
-- controles Cupertino
-- sheets diseñados exactamente como iOS
-
-============================================================
-21. DESIGN TOKENS
-    ============================================================
-
-Centraliza:
-
-spacing
-corner radius
-elevation
-poster aspect ratios
-card dimensions
-
-Ejemplo conceptual:
-
-Spacing:
-xs 4
-sm 8
-md 12
-lg 16
-xl 24
-xxl 32
-
-Usa shapes suaves/redondeados.
-
-Cards de Sofa son referencia visual,
-pero implementa Surface/Card Material 3.
-
-Poster ratio aproximado:
-2:3
-
-Backdrop:
-16:9
-
-No esparzas números mágicos por Composables.
-
-============================================================
-22. PROGRESS RING
-    ============================================================
-
-Crear componente reusable:
-
-MediaProgressRing()
+`MediaProgressRing()`
 
 Debe soportar:
 
-progress 0..1
-compact
-normal
-optional center content
+-   progress `0..1`;
+-   compact;
+-   normal;
+-   optional center content;
+-   indeterminate/unknown total cuando tenga sentido;
+-   animación suave.
 
-Usarlo:
+Debe poder aparecer en:
 
-- covers
-- cards
-- detail
-- Enjoying
-- list rows
+-   artwork;
+-   list rows;
+-   cards;
+-   detail;
+-   Enjoying;
+-   TV progress;
+-   book/manga progress.
 
-Animación suave al actualizar.
+------------------------------------------------------------------------
 
-============================================================
-23. THE PILE
-    ============================================================
+# 12. LISTS / HOME --- CONTRATO VISUAL
 
-Implementa The Pile como inbox especial.
+La pantalla principal debe inspirarse fuertemente en las referencias
+proporcionadas.
 
-No es una categoría.
+Orden conceptual:
 
-Puede contener cualquier LibraryItem.
+## The Pile
 
-Objetivo:
+Inbox rápido para guardar algo antes de organizarlo.
 
-veo algo interesante -> guardar inmediatamente -> organizar después.
+Debe poder mostrar previews visuales de sus items.
 
-Desde The Pile:
+## Enjoying
 
-Move to list
-Start tracking
-Remove
-Mark completed
+Resumen automático de contenido con tracking activo.
 
-============================================================
-24. ENJOYING
-    ============================================================
+Ejemplos:
 
-Enjoying no debe ser una lista mantenida manualmente.
+TV: - poster; - progress; - next episode.
 
-Debe derivarse de tracking activo.
+Book/Manga: - cover; - progress.
 
-TV:
-mostrar siguiente episodio.
+Game: - cover; - playing/current status.
 
-Books/Manga:
-mostrar progreso.
+## Pinned / Favorite Lists
 
-Games:
-mostrar estado Playing.
+Cards visuales cuando tenga sentido.
 
-Movies:
-mostrar Just Enjoying cuando esté activo.
+## Library / Lists
 
-Esto replica la idea útil de Sofa sin acoplarla a una lista.
+Resto de listas y grupos.
 
-============================================================
-25. ADD FLOW
-    ============================================================
+Debe soportar tanto presentación compacta como cards.
 
-El botón + debe abrir un ModalBottomSheet Android.
+------------------------------------------------------------------------
 
-Opciones:
+# 13. THE PILE
 
-Search media
-Add custom item
-Create list
-Create group
+The Pile es un inbox especial.
 
-Search media abre búsqueda global.
+NO es:
 
-Tras seleccionar:
+-   categoría;
+-   tracking status;
+-   media type.
 
-Add to The Pile
-Add to List
-Start Tracking
+Puede contener cualquier `LibraryItem`.
 
-Minimizar número de taps.
+Flujo:
 
-============================================================
-26. CUSTOM ITEMS
-    ============================================================
+`encuentro algo → guardar rápido → organizar después`
 
-El usuario debe poder añadir algo que no exista en APIs.
+Acciones futuras:
 
-Campos:
+-   Move to list
+-   Start tracking
+-   Remove from Pile
+-   Mark completed
+-   Open detail
 
-title
-category
-description
-image
-URL
-custom fields
+------------------------------------------------------------------------
 
-Esto es importante para que la app nunca dependa completamente de servicios
-externos.
+# 14. LISTAS Y GRUPOS
 
-============================================================
-27. NOTES
-    ============================================================
+Conceptualmente mantener:
 
-Cada LibraryItem puede tener notas personales.
+-   `MediaList`
+-   `ListGroup`
+-   relación list ↔ LibraryItem
 
-No mezclar:
+Una lista no duplica el item.
 
-Item notes
-Journal entries
+Tipos:
+
+## TODO
+
+Al completar un item puede ocultarse de la lista activa según
+configuración.
+
+## COLLECTION
+
+Los completados permanecen visibles.
+
+Funciones objetivo:
+
+-   create;
+-   edit;
+-   delete;
+-   duplicate;
+-   reorder;
+-   pin/unpin;
+-   move between groups;
+-   multi-select;
+-   move items;
+-   copy items;
+-   remove items.
+
+------------------------------------------------------------------------
+
+# 15. LAYOUTS DE LISTAS
+
+Soportar progresivamente:
+
+-   LIST
+-   SMALL_GRID
+-   LARGE_GRID
+-   DATA_CARDS
+
+Configuración por lista:
+
+-   layout;
+-   sort;
+-   group;
+-   filters;
+-   showLabels;
+-   artwork options cuando sean útiles.
+
+No duplicar la pantalla completa por layout.
+
+El contenido y las acciones deben compartir modelos/componentes.
+
+------------------------------------------------------------------------
+
+# 16. ITEM DETAIL --- CONTRATO VISUAL
+
+La pantalla de detalle debe ser una de las piezas visuales principales.
+
+Estructura aproximada:
+
+-   TopAppBar
+-   artwork/backdrop
+-   title
+-   category/list information
+-   tracking CTA o tracking summary
+-   Up Next cuando aplique
+-   progress
+-   description
+-   category metadata
+-   Ingredients
+-   Where to Watch cuando aplique
+-   Notes
+-   History / Logbook
+-   overflow actions
+
+Debe existir una base común con bloques específicos por categoría.
+
+NO crear una única `DetailScreen` monstruosa con decenas de `if`.
+
+------------------------------------------------------------------------
+
+# 17. ADD FLOW
+
+El botón de añadir debe minimizar taps.
+
+Entrada conceptual:
+
+-   Search media
+-   Add custom item
+-   Create list
+-   Create group
+
+Al seleccionar un resultado:
+
+-   Add to The Pile
+-   Add to list
+-   Start Tracking
+
+En el prototipo UI puede utilizar sample search data.
+
+Más adelante conectará providers reales.
+
+------------------------------------------------------------------------
+
+# 18. SEARCH / DISCOVERY
+
+La búsqueda final será global.
+
+Filtros/chips:
+
+-   All
+-   Movies
+-   TV
+-   Anime
+-   Books
+-   Manga
+-   Comics
+-   Games
+
+Modelo común conceptual:
+
+`SearchResult`
+
+Debe conservar:
+
+-   source;
+-   externalId;
+-   category;
+-   title;
+-   artwork;
+-   metadata mínima.
+
+La UI no debe depender directamente de TMDB.
+
+------------------------------------------------------------------------
+
+# 19. TRACKING --- MODELO DE EXPERIENCIA
+
+El tracking es una funcionalidad central.
+
+Modos:
+
+-   JUST_ENJOYING
+-   QUICK_LOG
+-   SIMPLE_COUNTER
+-   CHECKLIST
+-   JOURNAL
+
+La UI de selección debe explicar claramente qué hace cada modo y
+recomendar opciones según categoría sin obligar al usuario.
+
+## JUST_ENJOYING
+
+-   started date/time;
+-   currently enjoying;
+-   Mark as Done.
+
+Ideal cuando el usuario no quiere microgestionar.
+
+## QUICK_LOG
+
+Cada acción registra una sesión/evento.
+
+Puede incluir:
+
+-   timestamp;
+-   note opcional.
+
+## SIMPLE_COUNTER
+
+-   current;
+-   total opcional;
+-   unit.
+
+Ejemplos:
+
+-   pages;
+-   chapters;
+-   volumes;
+-   issues;
+-   milestones.
+
+## CHECKLIST
+
+Lista de unidades marcables.
+
+Ejemplos:
+
+-   episodes;
+-   chapters;
+-   volumes;
+-   custom checkpoints.
+
+## JOURNAL
+
+Entradas con:
+
+-   title;
+-   date/time;
+-   note;
+-   optional image.
+
+Ideal para milestones, experiencias y sesiones de juegos.
+
+------------------------------------------------------------------------
+
+# 20. ENJOYING
+
+Enjoying NO es una lista mantenida manualmente.
+
+Debe derivarse del tracking activo.
+
+La UI debe mostrar información específica útil:
+
+TV: - progress; - Up Next; - acción rápida para marcar episodio.
+
+Book/Manga: - progress; - unidad actual.
+
+Game: - playing; - tracking mode; - último log/milestone cuando proceda.
+
+Debe poder agrupar visualmente por:
+
+-   Today
+-   This Week
+-   Earlier
+
+si la experiencia final lo justifica.
+
+------------------------------------------------------------------------
+
+# 21. TV TRACKING --- CONTRATO VISUAL
+
+TV necesita una experiencia especializada.
+
+La UI objetivo debe incluir:
+
+## Show tracking overview
+
+-   poster;
+-   seasons count;
+-   episodes count;
+-   progress ring;
+-   watched/total;
+-   started date;
+-   tracking type;
+-   Include Specials;
+-   after-watching behavior.
+
+## Seasons
+
+Cada season:
+
+-   artwork;
+-   season number/name;
+-   date;
+-   episode count;
+-   completion control.
+
+## Episodes
+
+Cada episode:
+
+-   still;
+-   `Season X · Episode Y`;
+-   title;
+-   air date;
+-   runtime;
+-   watched state;
+-   watched date cuando exista;
+-   overview;
+-   Add Note.
+
+## Navigation
+
+Debe poder saltar entre temporadas cómodamente.
+
+Inspirarse en el selector inferior y menú de seasons de las screenshots,
+adaptado a Android.
+
+## Acciones
+
+-   mark watched;
+-   mark unwatched;
+-   mark season watched;
+-   mark all up to here;
+-   set watched date;
+-   next episode;
+-   include/exclude specials.
+
+## Up Next
+
+Debe existir una representación visual clara del siguiente episodio no
+visto.
+
+------------------------------------------------------------------------
+
+# 22. BOOK / MANGA / COMIC TRACKING --- CONTRATO VISUAL
+
+## Books
+
+Tracking posible por:
+
+-   pages;
+-   chapters;
+-   checklist;
+-   simple completion.
+
+## Manga
+
+-   chapters;
+-   volumes;
+-   checklist;
+-   counter.
+
+## Comics
+
+-   issues;
+-   volumes;
+-   checklist;
+-   counter.
+
+El total puede ser desconocido.
+
+La UI no debe romperse cuando `total == null`.
+
+------------------------------------------------------------------------
+
+# 23. VIDEO GAMES --- CONTRATO VISUAL
+
+Estados posibles:
+
+-   BACKLOG
+-   PLAYING
+-   PAUSED
+-   COMPLETED
+-   DROPPED
+
+Tracking especialmente útil:
+
+-   Just Enjoying
+-   Quick Log
+-   Simple Counter
+-   Journal
+
+Mostrar plataforma cuando esté disponible.
+
+Diseñar sin bloquear futuros múltiples playthroughs.
+
+------------------------------------------------------------------------
+
+# 24. ANIME
+
+Anime debe tener semántica propia aunque comparta componentes con TV.
+
+Estados objetivo:
+
+-   Plan to Watch
+-   Watching
+-   Completed
+-   Paused
+-   Dropped
+
+Metadata futura:
+
+-   episodes;
+-   season/year;
+-   studio;
+-   genres;
+-   provider id.
+
+No convertir Anime internamente en "TMDB TV" solo por conveniencia.
+
+------------------------------------------------------------------------
+
+# 25. LOGBOOK --- CONTRATO VISUAL
+
+El Logbook es historial.
+
+NO es fuente de verdad del estado actual.
+
+Pantalla raíz inspirada en referencias:
+
+-   Recent
+-   All
+-   Stats
+
+Vistas de actividad:
+
+-   Today
+-   Yesterday
+-   This Week
+-   Earlier
+
+Eventos futuros:
+
+-   STARTED
+-   COMPLETED
+-   EPISODE_WATCHED
+-   PROGRESS_CHANGED
+-   QUICK_LOG
+-   JOURNAL_ENTRY
+-   REWATCHED
+-   REREAD
+-   REPLAYED
+
+Filtros por categoría.
+
+El estado vacío debe estar diseñado, no ser texto provisional.
+
+------------------------------------------------------------------------
+
+# 26. PLANNER --- CONTRATO VISUAL
+
+Crear primero como experiencia UI con sample data.
+
+Secciones:
+
+-   Upcoming
+-   Today
+-   Past
+-   Someday
+
+Tipos:
+
+-   Events
+-   Notes
+-   Tasks
+
+Upcoming Releases:
+
+-   All Releases
+-   Apps
+-   Audiobooks
+-   Books
+-   Movies
+-   Music
+-   TV Episodes
+-   Video Games
+
+La implementación lógica real llegará después del prototipo visual.
+
+No integrar múltiples APIs de releases durante la fase UI.
+
+------------------------------------------------------------------------
+
+# 27. INGREDIENTS / CUSTOM FIELDS --- CONTRATO VISUAL
+
+Implementar el concepto de Ingredients de forma genérica.
+
+Modelo conceptual futuro:
+
+-   `CustomFieldDefinition`
+-   `CustomFieldValue`
+
+Tipos:
+
+-   TEXT
+-   NUMBER
+-   DATE
+-   URL
+-   BOOLEAN
+-   SINGLE_SELECT
+-   MULTI_SELECT
+-   RATING
+
+Ejemplos:
+
+Rating: `❤️ / 👍 / 👎`
+
+Recommended By: `John`
+
+Tags: `Family / Relaxing / ...`
+
+Priority: `High / Medium / Low`
+
+Owned: `true/false`
+
+La UI debe permitir:
+
+-   crear Ingredient;
+-   editarlo;
+-   definir opciones;
+-   limitarlo a categorías;
+-   mostrarlo en Detail;
+-   editar valores del item.
+
+------------------------------------------------------------------------
+
+# 28. SMART LISTS --- CONTRATO VISUAL
+
+Una Smart List almacena reglas, no items manuales.
+
+La UI debe soportar conceptualmente:
+
+-   Regular List / Smart List;
+-   templates;
+-   start from scratch;
+-   filtros generales;
+-   filtros por categoría;
+-   filtros de Ingredients;
+-   tracking status;
+-   progress tracking;
+-   genre.
+
+No implementar AI Smart Lists como requisito inicial.
+
+Primero debe existir un motor determinista fiable.
+
+Operadores futuros:
+
+-   EQUALS
+-   NOT_EQUALS
+-   CONTAINS
+-   NOT_CONTAINS
+-   GREATER_THAN
+-   LESS_THAN
+-   BEFORE
+-   AFTER
+-   IS_EMPTY
+-   IS_NOT_EMPTY
+
+------------------------------------------------------------------------
+
+# 29. NOTES, JOURNAL Y LOGBOOK
+
+Mantener conceptos separados.
+
+## Item Notes
+
+Notas personales asociadas al item.
+
+## Journal
+
+Parte de un tracking mode.
+
+## Logbook
+
+Historial de acciones/eventos.
+
+No fusionarlos en una sola tabla/concepto solo porque todos contienen
+texto.
+
+------------------------------------------------------------------------
+
+# 30. CUSTOM ITEMS
+
+Debe ser posible añadir contenido no disponible en APIs.
+
+Campos básicos:
+
+-   title;
+-   category;
+-   description;
+-   image;
+-   URL;
+-   custom fields.
+
+La app nunca debe depender completamente de proveedores externos.
+
+------------------------------------------------------------------------
+
+# 31. PROTOTIPO NAVEGABLE OBLIGATORIO
+
+Antes de comenzar la etapa de conexión completa con datos reales debe
+existir un prototipo Compose navegable que demuestre al menos:
+
+``` text
+Lists
+  → The Pile
+  → Item Detail
+  → Start Tracking
+  → Choose Tracking Mode
+  → Enjoying
+```
+
+``` text
+Lists
+  → TV Shows
+  → TV Show Detail
+  → Tracking
+  → Season
+  → Episode
+  → Mark Watched
+  → Up Next
+```
+
+``` text
+Lists
+  → Books
+  → Book Detail
+  → Simple Counter / Checklist
+```
+
+``` text
+Lists
+  → Games
+  → Game Detail
+  → Just Enjoying / Quick Log / Journal
+```
+
+``` text
+Planner
+  → Upcoming / Today / Past / Someday
+  → Releases
+```
+
+``` text
 Logbook
+  → Recent / All / Stats
+```
 
-Son conceptos distintos.
+``` text
+Create List
+  → Regular / Smart
+  → Filters
+```
 
-============================================================
-28. ANDROID-SPECIFIC FEATURES
-    ============================================================
+``` text
+Item Detail
+  → Ingredients
+```
 
-Una vez estable el core, aprovechar Android:
+Durante esta etapa se permiten sample data y fake repositories.
 
-Home screen widgets
-Share Target / Android Sharesheet
-App shortcuts
-Deep links
-Notifications
-Predictive back
-Dynamic Color
+------------------------------------------------------------------------
 
-Share Target debe permitir compartir:
+# 32. SAMPLE DATA
 
-URL
-texto
+Crear un conjunto coherente de datos de demostración.
 
-hacia Couchlist y después:
+Debe cubrir:
 
-resolver metadata cuando sea posible
-o crear Custom Item.
+-   películas;
+-   TV;
+-   libros;
+-   juegos;
+-   anime;
+-   manga;
+-   comics.
 
-============================================================
-29. TABLET / FOLDABLE
-    ============================================================
+Incluir casos:
 
-Las screenshots de Sofa para iPad sirven como referencia conceptual.
+-   sin progreso;
+-   progreso parcial;
+-   completado;
+-   total desconocido;
+-   artwork ausente;
+-   descripción larga;
+-   título largo;
+-   muchos episodios;
+-   empty list;
+-   lista grande;
+-   errores simulados;
+-   loading.
 
-Para Android grande:
+No depender de red para revisar el prototipo visual.
 
-List-detail layout.
+------------------------------------------------------------------------
 
-Izquierda:
+# 33. DOMAIN MODEL --- DIRECCIÓN FUTURA
 
-Lists / Groups
+TMDB es un provider.
 
-Derecha:
+NO es el dominio.
 
-contenido de la lista seleccionada.
+Conceptualmente:
 
-En Detail:
+``` text
+LibraryItem
+  id
+  category
+  source
+  externalId
+  title
+  subtitle
+  description
+  artwork
+  backdrop
+  releaseDate
+  dateAdded
+  metadata
+  userData
+```
 
-list -> detail side-by-side cuando haya espacio.
+Categorías:
 
-NO escales simplemente la UI de teléfono.
+-   MOVIE
+-   TV_SHOW
+-   ANIME
+-   BOOK
+-   MANGA
+-   COMIC
+-   VIDEO_GAME
+-   PODCAST
+-   AUDIOBOOK
+-   MUSIC
+-   CUSTOM
 
-============================================================
-30. ACCESIBILIDAD
-    ============================================================
+Los nombres concretos pueden cambiar después de inspeccionar el código.
 
-Todos los controles deben tener:
+No crear una mega tabla con decenas de columnas nullable.
 
-contentDescription cuando sea necesario
-touch targets >= 48dp
-contraste apropiado
-soporte font scaling
-semántica Compose adecuada
+Separar:
 
-No codificar información exclusivamente mediante color.
+-   propiedades comunes;
+-   metadata específica;
+-   tracking;
+-   listas;
+-   custom fields;
+-   historial;
+-   provider identity.
 
-============================================================
-31. PERFORMANCE
-    ============================================================
+------------------------------------------------------------------------
 
-Usar LazyColumn/LazyVerticalGrid.
+# 34. PROVIDERS
 
-Keys estables.
+Arquitectura preparada para:
 
-Evitar recomposiciones innecesarias.
+Movies / TV: - TMDB.
 
-No cargar listas gigantes completas en memoria si Room puede observarlas.
+Anime / Manga: - AniList u otro proveedor apropiado.
 
-Usar Flow desde DAO -> Repository -> ViewModel.
+Books: - Google Books / Open Library u otro proveedor.
 
-Imágenes mediante Coil.
+Games: - IGDB / RAWG u otro proveedor.
 
-No almacenar Bitmaps en Room.
+Comics: - provider apropiado cuando se implemente.
 
-============================================================
-32. ARQUITECTURA
-    ============================================================
+No integrar todas las APIs a la vez.
 
-Conserva la filosofía actual:
+Las API keys:
 
+-   nunca hardcoded;
+-   nunca committed;
+-   nunca impresas en logs.
+
+------------------------------------------------------------------------
+
+# 35. OFFLINE-FIRST
+
+La app final debe funcionar localmente para operaciones principales.
+
+Sin internet debe ser posible:
+
+-   abrir Library;
+-   abrir Lists;
+-   abrir items guardados;
+-   consultar metadata cacheada;
+-   modificar tracking;
+-   marcar episodios;
+-   escribir notes/journal;
+-   consultar Logbook;
+-   reorganizar listas.
+
+Internet será necesario principalmente para:
+
+-   remote search;
+-   metadata nueva;
+-   refresh;
+-   imágenes no cacheadas;
+-   servicios externos.
+
+Diseñar mutaciones para permitir cloud sync futuro, sin implementarlo
+prematuramente.
+
+------------------------------------------------------------------------
+
+# 36. ARQUITECTURA
+
+Mantener como dirección:
+
+``` text
 UI
 ↓
 ViewModel
@@ -1262,310 +1390,1102 @@ Domain repository
 ↓
 Repository implementation
 ↓
-Room / Remote providers
+Room / Remote provider
+```
 
-UI no debe hablar directamente con Retrofit/Room.
+Durante UI Prototype se permite:
 
-Mantener:
+``` text
+UI
+↓
+ViewModel / UI state
+↓
+Fake repository / SampleData
+```
 
-StateFlow
-immutable UI state
-one-shot effects donde sea apropiado
-Hilt
-coroutines
+siempre que pueda reemplazarse limpiamente por repositorios reales.
 
-Evita abstracciones ceremoniales que no aporten valor.
+Mantener cuando sea útil:
 
-No introduzcas una mega Clean Architecture con cientos de clases vacías.
+-   StateFlow;
+-   immutable UI state;
+-   one-shot effects;
+-   Hilt;
+-   coroutines.
 
-============================================================
-33. PACKAGE STRUCTURE
-    ============================================================
+No crear Clean Architecture ceremonial con cientos de clases sin valor.
 
-Adapta la estructura existente progresivamente hacia algo parecido a:
+No meter lógica de negocio en Composables.
 
-core/
-data/
-local/
-remote/
-repository/
-domain/
-model/
-repository/
-ui/
-components/
-theme/
-navigation/
+No llamar Retrofit directamente desde ViewModels.
 
-feature/
-lists/
-search/
-detail/
-tracking/
-logbook/
-smartlists/
-ingredients/
-settings/
+------------------------------------------------------------------------
 
-No reorganices todo de golpe si genera un diff gigantesco.
+# 37. ROOM --- ESQUEMA FINAL
 
-============================================================
-34. TESTS
-    ============================================================
+Cuando llegue la etapa de lógica/data:
 
-Añade tests prioritariamente para lógica de negocio:
+Diseñar Room a partir del dominio y del contrato UI ya estabilizado.
 
-Room migration
-Smart List rules
-Progress calculations
-Next TV episode
-Season completion
-Simple Counter
-status transitions
-duplicate detection
+No diseñar tablas solo para imitar componentes visuales.
 
-No pierdas tiempo haciendo snapshot tests de cada componente visual antes de
-tener estable el dominio.
+No duplicar `LibraryItem` por lista.
 
-============================================================
-35. REGLAS PARA TRABAJAR COMO AGENTE
-    ============================================================
+No usar una mega tabla multimedia.
 
-Trabaja iterativamente.
+El esquema debe soportar conceptualmente:
+
+-   Library items;
+-   provider identity;
+-   category metadata;
+-   lists;
+-   groups;
+-   list membership;
+-   The Pile;
+-   tracking sessions;
+-   progress;
+-   checklist units;
+-   TV seasons/episodes;
+-   notes;
+-   journal;
+-   logbook;
+-   custom fields;
+-   smart-list rules;
+-   planner cuando corresponda.
+
+Como la BD pre-release es desechable, si el esquema actual no es
+apropiado:
+
+**reemplazarlo limpiamente.**
+
+------------------------------------------------------------------------
+
+# 38. ACCESIBILIDAD
+
+Desde la fase UI, no dejar accesibilidad para el final.
+
+Requisitos:
+
+-   touch targets \>= 48dp cuando corresponda;
+-   content descriptions útiles;
+-   semántica Compose;
+-   font scaling;
+-   contraste;
+-   no depender solo de color;
+-   estados seleccionados comprensibles;
+-   TalkBack razonable.
+
+------------------------------------------------------------------------
+
+# 39. PERFORMANCE
+
+Usar:
+
+-   LazyColumn;
+-   LazyVerticalGrid;
+-   stable keys;
+-   Coil;
+-   flows observables cuando conectemos Room.
+
+Evitar:
+
+-   recomposiciones innecesarias;
+-   Bitmaps en Room;
+-   listas gigantes cargadas sin necesidad;
+-   parsing pesado dentro de Composables.
+
+Durante prototipo, sample data debe seguir patrones razonables para no
+ocultar problemas de layout/performance.
+
+------------------------------------------------------------------------
+
+# 40. TESTING
+
+## Durante UI Prototype
+
+Priorizar:
+
+-   compilación;
+-   navegación;
+-   ViewModel/UI-state tests cuando aporten valor;
+-   component previews;
+-   estados representativos;
+-   pruebas manuales visuales.
+
+No invertir enormes cantidades de tiempo en snapshot tests de un diseño
+que todavía está cambiando.
+
+## Durante Data/Logic
+
+Añadir tests para:
+
+-   list membership;
+-   Smart List rules;
+-   progress;
+-   counters;
+-   status transitions;
+-   duplicate detection;
+-   next TV episode;
+-   season completion;
+-   checklist behavior;
+-   Logbook generation;
+-   provider mapping.
+
+## Migraciones
+
+NO son prioridad durante pre-release con DB desechable.
+
+Después de `DATABASE STABILITY BASELINE`, añadir migration tests
+obligatorios.
+
+------------------------------------------------------------------------
+
+# 41. REGLAS PARA EL AGENTE
 
 Para cada fase:
 
-1. inspecciona implementación existente
-2. explica brevemente qué vas a modificar
-3. realiza cambios
-4. ejecuta formatter/lint cuando esté configurado
-5. compila
-6. ejecuta tests
-7. corrige errores
-8. revisa el diff
-9. actualiza documentación
-10. continúa
+1.  inspeccionar implementación existente;
+2.  revisar `git status` y diff;
+3.  identificar qué se puede reutilizar;
+4.  explicar brevemente el plan;
+5.  modificar en pasos razonables;
+6.  compilar frecuentemente;
+7.  ejecutar tests relevantes;
+8.  corregir errores;
+9.  revisar el diff final;
+10. actualizar documentación cuando proceda.
 
-NO declares una fase terminada si el proyecto no compila.
+No declarar una fase terminada si no compila.
 
-Comando mínimo:
+Comandos mínimos al final de una fase:
 
-./gradlew assembleDebug
-
-Y tests relevantes:
-
+``` bash
 ./gradlew test
+./gradlew assembleDebug
+```
 
-Si falla:
+Ejecutar lint adicional cuando esté configurado y sea razonable.
 
-investiga y corrige.
+No hacer commit ni push salvo instrucción explícita del usuario.
 
-No elimines una feature funcional simplemente porque sea más fácil reconstruirla.
+------------------------------------------------------------------------
 
-============================================================
-36. NO HACER
-    ============================================================
+# 42. REGLAS ESPECÍFICAS UI-FIRST
+
+Durante Phases 4--10:
+
+-   NO bloquear una pantalla esperando backend;
+-   NO ampliar Room solo para mostrar una maqueta;
+-   NO integrar una API porque falte sample data;
+-   NO conservar una pantalla mediocre por evitar un refactor;
+-   SÍ utilizar fake repositories;
+-   SÍ utilizar sample data;
+-   SÍ reemplazar UI existente;
+-   SÍ crear previews;
+-   SÍ probar light/dark;
+-   SÍ comprobar teléfonos pequeños y grandes;
+-   SÍ mantener componentes reutilizables.
+
+Una feature visual puede considerarse terminada aunque todavía use fake
+data SI:
+
+-   el flujo es navegable;
+-   los estados están representados;
+-   la interacción está definida;
+-   el contrato de UI está claro;
+-   compila;
+-   no introduce deuda estructural grave.
+
+------------------------------------------------------------------------
+
+# 43. NO HACER
 
 NO:
 
-- reescribir todo desde cero
-- convertir la app en una WebView
-- usar Flutter
-- usar React Native
-- abandonar Jetpack Compose
-- eliminar Room
-- eliminar TMDB
-- meter lógica de negocio dentro de Composables
-- meter Retrofit dentro de ViewModels
-- hardcodear API keys
-- usar fallbackToDestructiveMigration
-- hacer una única tabla Media con decenas de columnas nullable
-- duplicar entidades para cada lista
-- crear una pantalla completamente distinta para cada media type
-- copiar controles iOS pixel por pixel
-- copiar branding/assets propietarios de Sofa
-- introducir dependencias sin una razón clara
-- romper funcionalidad offline existente
-- hacer commits de secretos
+-   convertir la app en WebView;
+-   usar Flutter;
+-   usar React Native;
+-   abandonar Jetpack Compose;
+-   meter lógica de negocio en Composables;
+-   meter Retrofit en ViewModels;
+-   hardcodear API keys;
+-   hacer commit de secretos;
+-   crear una mega tabla Media con decenas de nullable;
+-   duplicar items por cada lista;
+-   inferir tracking únicamente desde pertenencia a una lista;
+-   usar Logbook como source of truth;
+-   hacer una pantalla completamente separada para cada categoría cuando
+    se pueda componer;
+-   copiar iOS pixel por pixel;
+-   copiar assets/branding propietarios de Sofa;
+-   introducir dependencias sin razón;
+-   integrar cinco providers simultáneamente;
+-   construir lógica compleja que la UI aún no ha validado;
+-   invertir tiempo en migraciones de bases pre-release desechables;
+-   buscar o depender de `AGENTS.md`.
 
-============================================================
-37. FASES
-    ============================================================
+SÍ está permitido:
 
-Implementa en este orden salvo que el análisis del repo revele una dependencia
-que justifique cambiarlo.
+-   reconstruir toda la capa UI si mejora el resultado;
+-   eliminar Composables obsoletos;
+-   rediseñar navegación;
+-   reemplazar Room schema durante pre-release;
+-   borrar datos locales de desarrollo;
+-   reemplazar implementaciones incompletas de fases anteriores si
+    existe una razón clara.
 
-PHASE 0
-Audit + documentation
+------------------------------------------------------------------------
 
-PHASE 1
-Generic Library domain
-Room migrations
-Desacoplar TMDB del dominio
+# 44. ROADMAP NUEVO
 
-PHASE 2
-Lists + Groups + The Pile
-Nueva Home Android inspirada en Sofa
+## PHASE 0 --- HISTÓRICA --- COMPLETADA
 
-PHASE 3
-Generic tracking engine
-Enjoying / In Progress
-ProgressRing
+Audit / planning inicial.
 
-PHASE 4
-TV episode tracking
-Seasons
-Episodes
-Up Next
+No repetir salvo que sea necesario para entender el estado actual.
 
-PHASE 5
-Logbook
+------------------------------------------------------------------------
 
-PHASE 6
-Anime/Manga provider + models
+## PHASE 1 --- HISTÓRICA --- COMPLETADA
 
-PHASE 7
-Books
+Generic Library domain.
 
-PHASE 8
-Video games
+Desacoplamiento inicial de TMDB.
 
-PHASE 9
-Comics
+Trabajo previo de Room/domain.
 
-PHASE 10
-Ingredients / Custom Fields
+No rehacer automáticamente.
 
-PHASE 11
-Smart Lists
+------------------------------------------------------------------------
 
-PHASE 12
-Layouts / sorting / grouping / filtering / multi-select
+## PHASE 2 --- HISTÓRICA --- COMPLETADA
 
-PHASE 13
-Android integration:
-Share Target
-Widgets
-Deep links
-Notifications
+Lists.
 
-PHASE 14
-Tablet/foldable adaptive UI
+Groups.
 
-PHASE 15
-Polish:
-animations
-accessibility
-performance
-empty states
-error handling
+The Pile.
 
-============================================================
-38. PRIMER OBJETIVO FUNCIONAL
-    ============================================================
+Trabajo previo de Home/Library.
 
-Antes de intentar implementar toda la aplicación, quiero alcanzar este
-vertical slice:
+No rehacer automáticamente, pero la UI puede reemplazarse durante el UI
+Reset.
 
-La aplicación abre en Lists.
+------------------------------------------------------------------------
 
-Veo:
+## PHASE 3 --- HISTÓRICA --- COMPLETADA
 
-THE PILE
+Generic Tracking.
 
-ENJOYING
-- TV actualmente viendo
-- libro actualmente leyendo
-- juego actualmente jugando
+Enjoying.
 
-MY LISTS
-- Movies To Watch
-- TV Shows
-- Anime
-- Books To Read
-- Manga
-- Comics
-- Games
+Progress.
 
-Puedo:
+No continuar directamente con el antiguo Phase 4.
 
-buscar película/serie mediante el TMDB existente
-añadirla a The Pile o una lista
-abrir Detail
-Start Tracking
-marcar progreso
-terminarla
-ver la acción reflejada en Logbook
+La estrategia cambia aquí.
 
-TV además debe mostrar el siguiente episodio.
+------------------------------------------------------------------------
 
-Una vez que ESTE flujo funcione de extremo a extremo y compile correctamente,
-continúa incorporando categorías externas.
+# STAGE A --- UI FOUNDATION & COMPLETE APP PROTOTYPE
 
-============================================================
-39. CRITERIO DE CALIDAD
-    ============================================================
+## PHASE 4 --- UI RESET + DESIGN SYSTEM
 
-La app final debe sentirse como si alguien hubiera tomado las mejores ideas de
-Sofa y hubiera diseñado la versión Android desde cero.
+### Objetivo
 
-No como:
+Establecer la identidad visual y el shell definitivo.
 
-"un clon iOS corriendo en Android".
+### Trabajo
+
+-   auditar UI existente;
+-   decidir keep/refactor/replace por pantalla;
+-   theme;
+-   typography;
+-   spacing;
+-   shapes;
+-   surfaces;
+-   artwork components;
+-   progress ring;
+-   reusable cards/rows;
+-   loading/error/empty states;
+-   app scaffold;
+-   navigation shell;
+-   sample-data infrastructure;
+-   previews.
+
+### Permitido
+
+Rehacer desde cero los Composables necesarios.
+
+### No hacer todavía
+
+-   nuevas APIs;
+-   TV backend complejo;
+-   Planner backend;
+-   Ingredients backend;
+-   Smart Lists backend.
+
+### Definition of Done
+
+La app abre en el nuevo shell visual y los componentes base son
+consistentes en light/dark.
+
+------------------------------------------------------------------------
+
+## PHASE 5 --- LISTS / HOME UI PROTOTYPE
+
+Construir con sample data:
+
+-   Lists root;
+-   The Pile;
+-   Enjoying preview;
+-   pinned/favorite lists;
+-   Library;
+-   groups;
+-   regular list detail;
+-   TODO / Collection visual semantics;
+-   list/grid/data-card presentations;
+-   list menus;
+-   create/edit list UI;
+-   empty states;
+-   multi-select visual flow.
+
+### Definition of Done
+
+Se puede navegar visualmente por la organización principal sin depender
+de backend nuevo.
+
+------------------------------------------------------------------------
+
+## PHASE 6 --- SEARCH + ADD + DETAIL UI PROTOTYPE
+
+Construir:
+
+-   global search;
+-   category chips;
+-   search results;
+-   Add flow;
+-   Add to Pile;
+-   Add to List;
+-   Start Tracking CTA;
+-   generic Media Detail;
+-   Movie Detail sample;
+-   TV Detail sample;
+-   Book Detail sample;
+-   Game Detail sample;
+-   metadata sections;
+-   Notes placeholder/flow;
+-   Ingredients section placeholder.
+
+### Definition of Done
+
+El flujo:
+
+`Search → Result → Detail → Add`
+
+es navegable con sample data.
+
+------------------------------------------------------------------------
+
+## PHASE 7 --- GENERIC TRACKING UI PROTOTYPE
+
+Construir UI completa para:
+
+-   tracking setup;
+-   mode recommendation;
+-   JUST_ENJOYING;
+-   QUICK_LOG;
+-   SIMPLE_COUNTER;
+-   CHECKLIST;
+-   JOURNAL;
+-   start date/time;
+-   completion;
+-   tracking summary;
+-   progress editing;
+-   history previews.
+
+No rediseñar todavía la lógica central salvo lo mínimo necesario para
+que el prototipo sea coherente.
+
+### Definition of Done
+
+Los cinco modos pueden demostrarse visualmente con ejemplos.
+
+------------------------------------------------------------------------
+
+## PHASE 8 --- TV UI PROTOTYPE
+
+Construir la experiencia de TV inspirada en las screenshots:
+
+-   Enjoying TV card;
+-   Up Next;
+-   show tracking detail;
+-   season cards;
+-   episode cards;
+-   season navigation;
+-   watched/unwatched;
+-   watched date;
+-   episode note UI;
+-   mark season;
+-   mark all up to here;
+-   Include Specials;
+-   progress;
+-   empty/loading/error states.
+
+Usar sample seasons/episodes cuando sea necesario.
+
+### Definition of Done
+
+Puede demostrarse:
+
+`TV Show → Season → Episode → watched → next episode`
+
+sin que el backend real limite la UI.
+
+------------------------------------------------------------------------
+
+## PHASE 9 --- LOGBOOK + PLANNER UI PROTOTYPE
+
+### Logbook
+
+-   root;
+-   Recent;
+-   All;
+-   Stats;
+-   activity timeline;
+-   filters;
+-   empty state.
+
+### Planner
+
+-   root;
+-   Upcoming;
+-   Today;
+-   Past;
+-   Someday;
+-   Events;
+-   Notes;
+-   Tasks;
+-   Upcoming Releases;
+-   category release screens.
+
+Sample data permitido.
+
+### Definition of Done
+
+Ambos destinos principales son navegables y visualmente coherentes.
+
+------------------------------------------------------------------------
+
+## PHASE 10 --- ADVANCED ORGANIZATION UI PROTOTYPE
+
+Construir:
+
+### Ingredients
+
+-   list;
+-   create;
+-   edit;
+-   types;
+-   options;
+-   category applicability;
+-   values on Detail.
+
+### Smart Lists
+
+-   Regular / Smart selector;
+-   create Smart List;
+-   templates UI;
+-   start from scratch;
+-   rule editor;
+-   category filters;
+-   Ingredient filters.
+
+### List customization
+
+-   layout;
+-   item shape;
+-   sort;
+-   group;
+-   filters;
+-   labels;
+-   cover/header options.
+
+### Gate obligatorio
+
+Al finalizar Phase 10:
+
+**NO empezar automáticamente Stage B.**
+
+Primero revisar visualmente toda la aplicación instalada.
+
+Corregir:
+
+-   inconsistencias;
+-   navegación;
+-   densidad;
+-   jerarquía;
+-   spacing;
+-   componentes duplicados;
+-   flows confusos;
+-   estados faltantes.
+
+Solo cuando el prototipo represente claramente la aplicación objetivo se
+congela el contrato UI inicial.
+
+------------------------------------------------------------------------
+
+# STAGE B --- DOMAIN / DATA IMPLEMENTATION
+
+## PHASE 11 --- FINAL DOMAIN REVIEW + FRESH ROOM SCHEMA
+
+Ahora sí diseñar/revisar el dominio según la UI validada.
+
+-   LibraryItem;
+-   category metadata;
+-   providers;
+-   lists/groups;
+-   Pile;
+-   tracking;
+-   TV units;
+-   Logbook;
+-   Notes;
+-   Ingredients;
+-   Smart Lists.
+
+Si Room actual no encaja:
+
+**eliminar/recrear el esquema.**
+
+No migrar datos experimentales.
+
+Añadir fake → real repository boundaries limpias.
+
+------------------------------------------------------------------------
+
+## PHASE 12 --- LISTS / PILE PERSISTENCE
+
+Conectar UI ya diseñada con:
+
+-   Room;
+-   repositories;
+-   ViewModels;
+-   list CRUD;
+-   groups;
+-   membership;
+-   Pile;
+-   ordering;
+-   pinned;
+-   list configuration.
+
+Eliminar mocks de esta área cuando deje de necesitarlos.
+
+------------------------------------------------------------------------
+
+## PHASE 13 --- SEARCH / PROVIDERS / DETAIL
+
+Conectar:
+
+-   TMDB existente;
+-   provider abstraction;
+-   global SearchResult;
+-   remote detail;
+-   cache;
+-   duplicate detection;
+-   add flow;
+-   Detail real para Movies/TV.
+
+No introducir todavía todos los providers.
+
+------------------------------------------------------------------------
+
+## PHASE 14 --- GENERIC TRACKING ENGINE
+
+Conectar la UI de tracking con lógica real.
+
+Implementar correctamente:
+
+-   sessions;
+-   status;
+-   JUST_ENJOYING;
+-   QUICK_LOG;
+-   SIMPLE_COUNTER;
+-   CHECKLIST;
+-   JOURNAL;
+-   completion;
+-   progress derivation;
+-   Enjoying derivado.
+
+Tracking debe ser source of truth de estado/progreso, no Logbook ni
+Lists.
+
+------------------------------------------------------------------------
+
+## PHASE 15 --- TV ENGINE
+
+Conectar UI de Phase 8.
+
+Implementar:
+
+-   TMDB seasons;
+-   TMDB episodes;
+-   local cache;
+-   episode watched state;
+-   watched dates;
+-   season completion;
+-   mark all up to here;
+-   specials;
+-   Up Next;
+-   offline behavior.
+
+------------------------------------------------------------------------
+
+## PHASE 16 --- LOGBOOK ENGINE
+
+Implementar historial real.
+
+`LogEntry` conceptual:
+
+-   id;
+-   libraryItemId;
+-   timestamp;
+-   eventType;
+-   trackingSessionId;
+-   optionalNote;
+-   metadata.
+
+Generar eventos a partir de acciones reales sin convertir Logbook en
+source of truth.
+
+Conectar Recent / All / Stats.
+
+------------------------------------------------------------------------
+
+## PHASE 17 --- ANIME + MANGA
+
+Elegir provider adecuado.
+
+Implementar:
+
+-   search;
+-   metadata;
+-   mapping;
+-   cache;
+-   tracking;
+-   statuses;
+-   Detail;
+-   integración con Lists/Enjoying/Logbook.
+
+Reutilizar UI existente.
+
+------------------------------------------------------------------------
+
+## PHASE 18 --- BOOKS
+
+Integrar provider.
+
+Implementar:
+
+-   authors;
+-   covers;
+-   publisher;
+-   pages;
+-   chapters cuando estén disponibles;
+-   counter/checklist;
+-   search/detail/cache.
+
+------------------------------------------------------------------------
+
+## PHASE 19 --- VIDEO GAMES
+
+Integrar provider.
+
+Implementar:
+
+-   metadata;
+-   platforms;
+-   release dates;
+-   statuses;
+-   tracking modes;
+-   journal;
+-   future-friendly playthrough model.
+
+------------------------------------------------------------------------
+
+## PHASE 20 --- COMICS
+
+Integrar provider cuando exista una opción adecuada.
+
+Implementar:
+
+-   series/issues/volumes;
+-   metadata;
+-   tracking;
+-   Detail;
+-   Lists/Enjoying/Logbook.
+
+------------------------------------------------------------------------
+
+## PHASE 21 --- INGREDIENTS ENGINE
+
+Implementar:
+
+-   definitions;
+-   values;
+-   types;
+-   options;
+-   category scope;
+-   Detail editing;
+-   persistence.
+
+Preparar consultas para Smart Lists.
+
+------------------------------------------------------------------------
+
+## PHASE 22 --- SMART LISTS ENGINE
+
+Implementar motor determinista.
+
+-   rules;
+-   operators;
+-   AND/OR si el diseño lo requiere;
+-   category fields;
+-   tracking fields;
+-   Ingredients;
+-   reactive results.
+
+No AI como requisito.
+
+------------------------------------------------------------------------
+
+## PHASE 23 --- PLANNER / RELEASE DATA
+
+Conectar Planner a datos reales donde aporte valor.
+
+Definir claramente qué elementos son:
+
+-   eventos del usuario;
+-   tasks;
+-   notes;
+-   releases externas.
+
+No mezclar releases con Logbook.
+
+------------------------------------------------------------------------
+
+# STAGE C --- ANDROID INTEGRATION & PRODUCTION HARDENING
+
+## PHASE 24 --- ANDROID INTEGRATIONS
+
+Evaluar/implementar:
+
+-   Share Target;
+-   Sharesheet;
+-   widgets;
+-   app shortcuts;
+-   deep links;
+-   notifications;
+-   predictive back refinements.
+
+Share Target debe poder aceptar:
+
+-   URL;
+-   text;
+
+y resolver metadata o crear Custom Item.
+
+------------------------------------------------------------------------
+
+## PHASE 25 --- TABLET / FOLDABLE
+
+Implementar adaptive UI real:
+
+-   NavigationRail;
+-   list-detail;
+-   supporting panes;
+-   master/detail;
+-   responsive grids;
+-   landscape.
+
+No estirar la UI de teléfono.
+
+------------------------------------------------------------------------
+
+## PHASE 26 --- POLISH
+
+-   animations;
+-   transitions;
+-   haptics cuando aporten valor;
+-   accessibility;
+-   performance;
+-   error handling;
+-   empty states;
+-   loading states;
+-   offline UX;
+-   typography refinements;
+-   visual consistency.
+
+------------------------------------------------------------------------
+
+## PHASE 27 --- DATABASE STABILITY BASELINE
+
+Antes de beta/release con datos importantes:
+
+1.  revisar esquema Room;
+2.  eliminar restos experimentales;
+3.  documentar versión baseline;
+4.  desactivar política destructiva de producción;
+5.  exigir migraciones explícitas futuras;
+6.  añadir migration tests;
+7.  validar backup/restore cuando corresponda.
+
+A partir de aquí los datos del usuario son sagrados.
+
+------------------------------------------------------------------------
+
+## PHASE 28 --- RELEASE READINESS
+
+-   secrets review;
+-   ProGuard/R8;
+-   crash handling;
+-   analytics solo si se decide explícitamente;
+-   privacy review;
+-   provider attribution;
+-   licenses;
+-   performance;
+-   startup;
+-   offline testing;
+-   accessibility pass;
+-   release build;
+-   store assets posteriormente.
+
+------------------------------------------------------------------------
+
+# 45. ORDEN DE IMPLEMENTACIÓN DENTRO DE UNA FASE UI
+
+Para evitar enormes cambios no verificables:
+
+1.  sample models;
+2.  low-level components;
+3.  screen layout;
+4.  interactions;
+5.  navigation;
+6.  states;
+7.  light/dark;
+8.  previews;
+9.  compile;
+10. tests relevantes;
+11. manual visual review;
+12. cleanup.
+
+No construir diez pantallas rotas simultáneamente.
+
+------------------------------------------------------------------------
+
+# 46. CRITERIOS DE REVISIÓN VISUAL
+
+Para cada pantalla comparar con las referencias en términos de:
+
+-   jerarquía;
+-   densidad;
+-   artwork;
+-   spacing;
+-   legibilidad;
+-   agrupación;
+-   affordances;
+-   acciones principales;
+-   scroll behavior;
+-   empty state;
+-   dark mode;
+-   uso con una mano;
+-   claridad.
+
+No preguntar:
+
+"¿Es idéntica a Sofa?"
+
+Preguntar:
+
+"¿Conserva las buenas ideas de Sofa y se siente como una excelente app
+Android?"
+
+------------------------------------------------------------------------
+
+# 47. CRITERIO DE CALIDAD
+
+La aplicación final debe sentirse como una versión Android diseñada
+desde cero a partir de las mejores ideas de organización y tracking
+vistas en Sofa.
+
+No debe sentirse como:
+
+-   un clon iOS;
+-   una base de datos con UI;
+-   una colección de pantallas independientes;
+-   un proyecto demo;
+-   una app centrada únicamente en TMDB.
 
 Debe sentirse:
 
-rápida
-coherente
-offline-first
-visual
-agradable
-simple para acciones comunes
-potente cuando quiero organizar mucho contenido.
+-   rápida;
+-   coherente;
+-   visual;
+-   offline-first;
+-   agradable;
+-   simple en acciones frecuentes;
+-   potente para usuarios avanzados.
 
-La complejidad debe aparecer progresivamente.
+------------------------------------------------------------------------
 
-Un usuario nuevo debería poder simplemente:
+# 48. PRIMER OBJETIVO A PARTIR DEL ESTADO ACTUAL
 
-buscar -> añadir -> disfrutar -> terminar
+Phases 1--3 están completadas.
 
-sin entender Smart Lists, Ingredients ni tracking modes.
+Por tanto el siguiente trabajo es:
 
-Un usuario avanzado podrá después configurar todo.
+## PHASE 4 --- UI RESET + DESIGN SYSTEM
 
-============================================================
-40. EMPIEZA AHORA
-    ============================================================
+Antes de escribir código:
 
-Empieza inspeccionando el repositorio completo.
+1.  inspeccionar el repositorio completo;
+2.  inspeccionar específicamente toda la capa Compose;
+3.  comprobar navegación actual;
+4.  revisar qué features posteriores ya existen parcialmente;
+5.  comparar pantallas actuales con las screenshots proporcionadas;
+6.  clasificar cada pantalla/componente como:
+    -   KEEP
+    -   REFACTOR
+    -   REPLACE
+7.  proponer la estructura del nuevo design system;
+8.  identificar mocks/sample data necesarios.
 
-No escribas código todavía.
+Después comenzar Phase 4.
 
-Primero produce:
+No comenzar el antiguo "Phase 4 TV Tracking".
 
-docs/SOFA_EVOLUTION_PLAN.md
+El roadmap anterior queda sustituido por este documento.
 
-y muéstrame un resumen con:
+------------------------------------------------------------------------
 
-CURRENT STATE
-REUSABLE COMPONENTS
-ARCHITECTURAL PROBLEMS
-TARGET DOMAIN MODEL
-DATABASE MIGRATION STRATEGY
-TARGET NAVIGATION
-PHASE PLAN
+# 49. PROMPT OPERATIVO PARA INICIAR PHASE 4
+
+Al comenzar una nueva sesión de agente, usar este contexto:
+
+``` text
+Read EVOLUTION_PLAN.md completely before making changes.
+
+Important project state:
+- Historical Phases 0, 1, 2 and 3 are completed.
+- AGENTS.md no longer exists. Do not look for it or recreate it.
+- The roadmap has switched to UI-FIRST development.
+- Do NOT continue the old Phase 4.
+- Current local databases contain no production data and are disposable.
+- Backwards-compatible Room migrations are NOT required during this pre-release stage.
+- Existing Compose UI may be heavily refactored or replaced when needed.
+- Preserve useful architecture, not obsolete UI.
+
+Your task is ONLY the current Phase 4: UI RESET + DESIGN SYSTEM.
+
+First inspect the complete repository and actual current implementation.
+Do not trust the README or old phase assumptions blindly.
+
+Before coding, report briefly:
+CURRENT UI STATE
+KEEP
+REFACTOR
+REPLACE
+NAVIGATION CHANGES
+DESIGN SYSTEM PLAN
+SAMPLE DATA PLAN
 FILES EXPECTED TO CHANGE
 
-Después comienza PHASE 1.
+Then implement Phase 4 incrementally.
 
-Al terminar cada fase informa únicamente:
+Do not implement Phase 5+.
+Do not integrate new external providers.
+Do not build Planner/Ingredients/Smart Lists backend.
+Do not commit or push.
 
+At the end run:
+./gradlew test
+./gradlew assembleDebug
+
+Then report:
 PHASE
 CHANGED
+UI COMPONENTS
+NAVIGATION CHANGES
 DATABASE CHANGES
 TESTS
 BUILD RESULT
+KNOWN ISSUES
 NEXT
+```
 
-No me pidas que tome decisiones triviales de implementación.
-Tómalas tú siguiendo las reglas anteriores.
+------------------------------------------------------------------------
+
+# 50. FORMATO DE REPORTE AL FINAL DE CADA FASE
+
+``` text
+PHASE
+
+CHANGED
+
+UI COMPONENTS
+
+NAVIGATION CHANGES
+
+DATABASE CHANGES
+
+TESTS
+
+BUILD RESULT
+
+KNOWN ISSUES
+
+NEXT
+```
+
+Si una categoría no aplica, indicar `None`.
+
+No declarar `BUILD RESULT: PASS` sin haber ejecutado realmente el build
+correspondiente.
+
+------------------------------------------------------------------------
+
+# 51. PRINCIPIO FINAL
+
+Durante esta etapa temprana tenemos una ventaja importante:
+
+**podemos cambiar las cosas correctamente antes de tener usuarios y
+datos que mantener.**
+
+Aprovéchala.
+
+No conservar decisiones débiles solo por compatibilidad con versiones
+que nadie utiliza.
+
+Al mismo tiempo, no reescribir infraestructura sólida por impulso.
+
+La prioridad es:
+
+``` text
+EXPERIENCIA OBJETIVO
+        ↓
+UI NAVEGABLE
+        ↓
+CONTRATO VISUAL ESTABLE
+        ↓
+DOMINIO / ROOM
+        ↓
+PROVIDERS
+        ↓
+HARDENING
+        ↓
+RELEASE
+```
+
+Primero construir la aplicación que queremos usar.
+
+Después hacer que todos sus datos y servicios la alimenten
+correctamente.

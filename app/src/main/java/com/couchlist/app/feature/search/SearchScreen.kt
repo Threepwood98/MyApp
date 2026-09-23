@@ -1,12 +1,10 @@
 package com.couchlist.app.feature.search
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,7 +20,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,8 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -56,8 +51,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.couchlist.app.core.domain.model.MediaCategory
 import com.couchlist.app.core.domain.model.MediaReference
 import com.couchlist.app.core.domain.model.MediaSearchResult
+import com.couchlist.app.core.ui.components.EmptyState
+import com.couchlist.app.core.ui.components.ErrorState
+import com.couchlist.app.core.ui.components.LibraryItemCard
+import com.couchlist.app.core.ui.components.LoadingState
 import com.couchlist.app.core.ui.theme.CouchlistTheme
-import coil3.compose.AsyncImage
+import com.couchlist.app.core.ui.theme.spacing
 
 @Composable
 fun SearchRoute(
@@ -134,19 +133,39 @@ private fun SearchContent(
                 isSearching = uiState.isSearching,
                 onQueryChange = onQueryChange,
             )
-            when {
-                uiState.query.isBlank() -> SearchEmptyState()
-                uiState.errorMessage != null -> SearchErrorState(
-                    message = uiState.errorMessage,
-                    onRetry = onRetry,
-                )
-                else -> SearchResultsGrid(
-                    results = uiState.results,
-                    inLibraryReferences = uiState.inLibraryReferences,
-                    inPileReferences = uiState.inPileReferences,
-                    onAddToPile = onAddToPile,
-                    onResultClick = onResultClick,
-                )
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                when {
+                    uiState.query.isBlank() -> EmptyState(
+                        title = "Find your next favorite",
+                        message = "Search movies and TV shows to add to your lists.",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    uiState.errorMessage != null -> ErrorState(
+                        message = uiState.errorMessage,
+                        modifier = Modifier.fillMaxSize(),
+                        action = {
+                            Button(onClick = onRetry) {
+                                Text(text = "Try again")
+                            }
+                        },
+                    )
+                    uiState.isSearching && uiState.results.isEmpty() -> LoadingState(
+                        label = "Searching",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    uiState.results.isEmpty() -> EmptyState(
+                        title = "No matches found",
+                        message = "Try a different title or spelling.",
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    else -> SearchResultsGrid(
+                        results = uiState.results,
+                        inLibraryReferences = uiState.inLibraryReferences,
+                        inPileReferences = uiState.inPileReferences,
+                        onAddToPile = onAddToPile,
+                        onResultClick = onResultClick,
+                    )
+                }
             }
         }
     }
@@ -185,48 +204,12 @@ private fun SearchField(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(
+                horizontal = MaterialTheme.spacing.large,
+                vertical = MaterialTheme.spacing.small,
+            )
             .focusRequester(focusRequester),
     )
-}
-
-@Composable
-private fun SearchEmptyState() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Search movies and TV shows to add to your lists.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun SearchErrorState(
-    message: String,
-    onRetry: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Button(onClick = onRetry) {
-            Text(text = "Try again")
-        }
-    }
 }
 
 @Composable
@@ -238,10 +221,10 @@ private fun SearchResultsGrid(
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        columns = GridCells.Adaptive(144.dp),
+        contentPadding = PaddingValues(MaterialTheme.spacing.large),
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.large),
         modifier = Modifier.fillMaxSize(),
     ) {
         items(items = results, key = { it.reference.stableKey }) { result ->
@@ -264,27 +247,30 @@ private fun MediaResultCard(
     onAddToPile: (MediaSearchResult) -> Unit,
     onResultClick: (MediaSearchResult) -> Unit,
 ) {
-    Column(modifier = Modifier.clickable { onResultClick(result) }) {
-        Box {
-            AsyncImage(
-                model = result.artworkUri,
-                contentDescription = result.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-            )
+    val subtitle = listOfNotNull(
+        result.releaseYear?.toString(),
+        result.voteAverage.takeIf { it > 0.0 }?.toString(),
+    ).joinToString(" · ")
+    LibraryItemCard(
+        title = result.title,
+        subtitle = subtitle.takeIf { it.isNotBlank() },
+        artworkModel = result.artworkUri,
+        onClick = { onResultClick(result) },
+        artworkOverlay = {
             Surface(
-                color = MaterialTheme.colorScheme.surface,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 shape = MaterialTheme.shapes.extraSmall,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(6.dp),
+                    .padding(MaterialTheme.spacing.small),
             ) {
                 Text(
                     text = result.category.name,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(
+                        horizontal = MaterialTheme.spacing.small,
+                        vertical = MaterialTheme.spacing.extraSmall,
+                    ),
                 )
             }
             if (isInLibrary || isInPile) {
@@ -293,10 +279,13 @@ private fun MediaResultCard(
                     shape = MaterialTheme.shapes.extraSmall,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(6.dp),
+                        .padding(MaterialTheme.spacing.small),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(
+                            horizontal = MaterialTheme.spacing.small,
+                            vertical = MaterialTheme.spacing.extraSmall,
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
@@ -305,7 +294,7 @@ private fun MediaResultCard(
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(12.dp),
                         )
-                        Spacer(modifier = Modifier.width(2.dp))
+                        Spacer(modifier = Modifier.width(MaterialTheme.spacing.extraSmall))
                         Text(
                             text = if (isInPile) "In Pile" else "In library",
                             style = MaterialTheme.typography.labelSmall,
@@ -315,49 +304,23 @@ private fun MediaResultCard(
                 }
             }
             if (!isInPile) {
-                IconButton(
-                    onClick = { onAddToPile(result) },
+                Surface(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    shape = MaterialTheme.shapes.extraLarge,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(4.dp),
+                        .padding(MaterialTheme.spacing.small),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add ${result.title} to The Pile",
-                    )
+                    IconButton(onClick = { onAddToPile(result) }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add ${result.title} to The Pile",
+                        )
+                    }
                 }
             }
-        }
-        Text(
-            text = result.title,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        val subtitle = listOfNotNull(
-            result.releaseYear?.toString(),
-            if (result.voteAverage > 0.0) "${result.voteAverage}" else null,
-        ).joinToString(" · ")
-        if (subtitle.isNotBlank()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (result.voteAverage > 0.0) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
+        },
+    )
 }
 
 @Preview(showBackground = true)
